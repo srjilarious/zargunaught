@@ -86,31 +86,59 @@ pub const OptionList = struct {
 
         return null;
     }
+
+    pub fn findShortOption(self: *OptionList, optName: []const u8) ?Option {
+        for (self.options.items) |opt| {
+            if (std.mem.eql(u8, opt.shortName, optName)) {
+                return opt;
+            }
+        }
+
+        return null;
+    }
 };
 
 pub const Command = struct { 
     name: []const u8, 
-    description: []const u8, 
+    description: []const u8,
     options: OptionList 
+};
+
+pub const ArgParserOpts = struct {
+    name: ?[]const u8 = null,
+    banner: ?[]const u8 = null,
+    description: ?[]const u8 = null,
+    usage: ?[]const u8 = null,
+    opts: ?[]const Option = null,
 };
 
 pub const ArgParser = struct {
     name: []const u8,
-    banner: []const u8,
-    description: []const u8,
-    usage: []const u8,
+    banner: ?[]const u8,
+    description: ?[]const u8,
+    usage: ?[]const u8,
     options: OptionList,
     alloc: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) ArgParser {
-        return ArgParser{ 
+    pub fn init(allocator: std.mem.Allocator, opts: ArgParserOpts) !ArgParser {
+        var argsParser = ArgParser{ 
             .name = "", 
-            .banner = "", 
-            .description = "", 
-            .usage = "", 
+            .banner = opts.banner, 
+            .description = opts.description, 
+            .usage = opts.usage, 
             .options = OptionList.init(allocator),
             .alloc = allocator
         };
+
+        if(opts.name != null) {
+            argsParser.name = opts.name.?;
+        }
+
+        if(opts.opts != null) {
+            try argsParser.options.addOptions(opts.opts.?);
+        }
+
+        return argsParser;
     }
 
     pub fn deinit(self: ArgParser) void {

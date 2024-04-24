@@ -1,26 +1,14 @@
 const std = @import("std");
 const zargs = @import("zargunaught");
+const testz = @import("testz");
 
-const Option = zargs.Option;
+const Tests = testz.discoverTests(.{
+    @import("./option_tests.zig"),
+    // @import("./keymap_tests.zig"),
+});
 
-pub fn main() !void {
-    try basicOptionParsing();
-}
+pub fn main() void {
+    const verbose = if (std.os.argv.len > 1 and std.mem.eql(u8, "verbose", std.mem.span(std.os.argv[1]))) true else false;
 
-fn basicOptionParsing() !void {
-    std.debug.print("Basic option parsing...\n", .{});
-    var parser = zargs.ArgParser.init(std.heap.page_allocator);
-    _ = try parser.withOptions(&[_]Option{
-        Option{ .longName = "alpha", .shortName = "a", .description = "", .maxNumParams = 0 },
-        Option{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
-        Option{ .longName = "gamma", .shortName = "g", .description = "", .maxNumParams = -1 },
-    });
-    defer parser.deinit();
-
-    var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
-    try args.append("--alpha");
-    try args.append("--beta");
-    try args.append("test!");
-
-    parser.parse(args);
+    _ = testz.runTests(Tests, verbose);
 }

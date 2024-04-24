@@ -1,3 +1,4 @@
+// zig fmt: off
 const std = @import("std");
 const zargs = @import("zargunaught");
 
@@ -9,12 +10,16 @@ pub fn main() !void {
 
 fn basicOptionParsing() !void {
     std.debug.print("Basic option parsing...\n", .{});
-    var parser = zargs.ArgParser.init(std.heap.page_allocator);
-    _ = try parser.withOptions(&[_]Option{
-        Option{ .longName = "alpha", .shortName = "a", .description = "", .maxNumParams = 0 },
-        Option{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
-        Option{ .longName = "gamma", .shortName = "g", .description = "", .maxNumParams = -1 },
-    });
+    var parser = try zargs.ArgParser.init(
+        std.heap.page_allocator, .{ 
+            .name = "Test program", 
+            .description = "A cool test program", 
+            .opts = &[_]Option{
+                Option{ .longName = "alpha", .shortName = "a", .description = "", .maxNumParams = 0 },
+                Option{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
+                Option{ .longName = "gamma", .shortName = "g", .description = "", .maxNumParams = -1 },
+            } 
+        });
     defer parser.deinit();
 
     var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
