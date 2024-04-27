@@ -11,7 +11,7 @@ pub fn anOptionMustHaveALongNameTest() !void {
         try testz.expectEqual(err, zargs.ParserConfigError.LongOptionNameMissing);
         return;
     };
-    try testz.expectTrue(false);
+    try testz.fail();
 }
 
 pub fn aLongOptionMustNotBeginWithANumberTest() !void {
@@ -22,7 +22,7 @@ pub fn aLongOptionMustNotBeginWithANumberTest() !void {
         try testz.expectEqual(err, zargs.ParserConfigError.OptionBeginsWithNumber);
         return;
     };
-    try testz.expectTrue(false);
+    try testz.fail();
 }
 
 pub fn aShortOptionMustNotBeginWithANumberTest() !void {
@@ -34,6 +34,30 @@ pub fn aShortOptionMustNotBeginWithANumberTest() !void {
         return;
     };
 
-    try testz.expectTrue(false);
+    try testz.fail();
+}
+
+pub fn aLongOptionMustBeUniqueTest() !void {
+    _ = zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Bad option configuration", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
+        .{ .longName = "beta", .shortName = "d", .description = "", .maxNumParams = 1 },
+    } }) catch |err| {
+        try testz.expectEqual(err, zargs.ParserConfigError.DuplicateOption);
+        return;
+    };
+
+    try testz.fail();
+}
+
+pub fn aShortOptionMustBeUniqueTest() !void {
+    _ = zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Bad option configuration", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
+        .{ .longName = "delta", .shortName = "b", .description = "", .maxNumParams = 1 },
+    } }) catch |err| {
+        try testz.expectEqual(err, zargs.ParserConfigError.DuplicateOption);
+        return;
+    };
+
+    try testz.fail();
 }
 
