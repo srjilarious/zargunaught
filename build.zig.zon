@@ -16,10 +16,15 @@
     // internet connectivity.
     .dependencies = .{
         .testz = .{
-            .url = "https://github.com/srjilarious/testz/archive/49528d2.tar.gz",
-            .hash = "12200811a46177bab3a72c34cd184d715133751a1c2b447caf61f7f6652e552f3dcb",
-            .lazy = true,
+            .path = "../testz",
+            // .hash = "12200811a46177bab3a72c34cd184d715133751a1c2b447caf61f7f6652e552f3dcb",
+            // .lazy = true,
         },
+        // .testz = .{
+        //     .url = "https://github.com/srjilarious/testz/archive/49528d2.tar.gz",
+        //     .hash = "12200811a46177bab3a72c34cd184d715133751a1c2b447caf61f7f6652e552f3dcb",
+        //     // .lazy = true,
+        // },
         // See `zig fetch --save <url>` for a command-line interface for adding dependencies.
         //.example = .{
         //    // When updating this field to a new URL, be sure to delete the corresponding
