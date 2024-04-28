@@ -61,3 +61,23 @@ pub fn aShortOptionMustBeUniqueTest() !void {
     try testz.fail();
 }
 
+pub fn simpleLongOptionParseTest() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
+        .{ .longName = "delta", .shortName = "d", .description = "", .maxNumParams = 1 },
+    } });
+    defer parser.deinit();
+
+    var sysv = std.ArrayList([]const u8).init(std.heap.page_allocator);
+    defer sysv.deinit();
+    try sysv.append("--beta");
+    try sysv.append("123");
+
+    const args = try parser.parse(sysv);
+    try testz.expectEqual(args.options.items.len, 1);
+    const opt = args.options.items[0];
+    try testz.expectEqual(opt.name, "beta");
+    try testz.expectEqual(opt.values.items.len, 1);
+    try testz.expectEqual(opt.values.items[0], "123");
+}
+

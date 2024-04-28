@@ -1,5 +1,6 @@
 // zig fmt: off
 const std = @import("std");
+const ArgQueue = std.TailQueue([]const u8);
 
 pub const ParserConfigError = error{ 
     LongOptionNameMissing,
@@ -18,6 +19,7 @@ pub const Option = struct {
     description: []const u8,
     maxNumParams: i8 = 0,
 };
+
 
 pub const OptionResult = struct {
     name: []const u8,
@@ -160,7 +162,7 @@ pub const ArgParser = struct {
         return self;
     }
 
-    fn parseOption(self: *ArgParser, parseText: *std.TailQueue([]const u8), parseResult: *ArgParserResult) ?OptionResult {
+    fn parseOption(self: *ArgParser, parseText: *ArgQueue, parseResult: *ArgParserResult) ParseError!?OptionResult {
         if (parseText.len == 0) return null;
 
         const optFullName = parseText.first.?.data;
@@ -174,13 +176,12 @@ pub const ArgParser = struct {
         }
 
         var optName: []const u8 = undefined;
-        var opt: ?Option = undefined;
+        var opt: ?Option = null;
 
         if (optFullName[0] == '-' and optFullName[1] == '-') {
             optName = optFullName[2..];
             // TODO Add looking for command option..
             opt = self.options.findLongOption(optName);
-            std.debug.print("Found option! {s}\n", .{optName});
         }
 
         _ = parseText.popFirst();
@@ -205,36 +206,59 @@ pub const ArgParser = struct {
 
                 paramCounter += 1;
 
-                std.debug.print("    Option param: {s}\n", .{currVal});
+                //std.debug.print("    Option param: {s}\n", .{currVal});
             }
 
             return optResult;
         } else {
-            // TODO: Add unknown option error.
+            return ParseError.UnknownOption;
         }
 
         return null;
     }
 
-    pub fn parse(self: *ArgParser, args: std.ArrayList([]const u8)) void {
-        std.debug.print("Hello from parse!\n", .{});
-        for (self.options.options.items) |opt| {
-            std.debug.print("Option: --{s}, -{s}\n", .{ opt.longName, opt.shortName });
-        }
+    fn isNextItemLikelyAnOption(queue: *ArgQueue) bool {
+        return queue.len > 0 and 
+               queue.first != null and 
+               queue.first.?.data.len > 0 and
+               queue.first.?.data[0] == '-';
+    }
 
-        var parseText = std.TailQueue([]const u8){};
+    pub fn parse(self: *ArgParser, args: std.ArrayList([]const u8)) !ArgParserResult 
+    {
+        // for (self.options.options.items) |opt| {
+        //     std.debug.print("Option: --{s}, -{s}\n", .{ opt.longName, opt.shortName });
+        // }
+
+        var parseText = ArgQueue{};
         for (args.items) |arg| {
-            const new_node = self.alloc.create(std.TailQueue([]const u8).Node) catch unreachable;
-            new_node.* = std.TailQueue([]const u8).Node{ .prev = undefined, .next = undefined, .data = arg };
+            const new_node = self.alloc.create(ArgQueue.Node) catch unreachable;
+            new_node.* = ArgQueue.Node{ .prev = undefined, .next = undefined, .data = arg };
             parseText.append(new_node);
         }
 
         // TODO: fix allocator usage.
         var parseResult = ArgParserResult.init(self.alloc);
         // var lastOpt: ?OptionResult = null;
-        while (parseText.len > 0) {
-            _ = self.parseOption(&parseText, &parseResult);
+        if(parseText.len == 0) return parseResult;
+
+        while (isNextItemLikelyAnOption(&parseText)) {
+            // Check if we ran into a number
+            const frontData = parseText.first.?.data;
+            if (frontData.len > 1 and std.ascii.isDigit(frontData[1])) break;
+
+            // TODO: change to catching and adding a better error.
+            const optRes = try self.parseOption(&parseText, &parseResult);
+            if(optRes == null) break;
+
+            try parseResult.options.append(optRes.?);
         }
+
+        if(parseText.len == 0) return parseResult;
+
+        // Setup command list.
+
+        return parseResult;
     }
 };
 

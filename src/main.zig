@@ -27,5 +27,5 @@ fn basicOptionParsing() !void {
     try args.append("--beta");
     try args.append("test!");
 
-    parser.parse(args);
+    _ = try parser.parse(args);
 }
