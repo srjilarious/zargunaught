@@ -2,6 +2,8 @@
 const std = @import("std");
 const ArgQueue = std.TailQueue([]const u8);
 
+pub const utils = @import("./utils.zig");
+
 pub const ParserConfigError = error{ 
     LongOptionNameMissing,
     OptionBeginsWithNumber,
