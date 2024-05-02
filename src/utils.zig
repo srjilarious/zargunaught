@@ -13,11 +13,19 @@ pub fn tokenizeShellString(alloc: std.mem.Allocator, input: []const u8) ![][]con
     while (i < input.len) {
         switch (input[i]) {
             '\'' => {
+                if (in_single_quote) {
+                    try tokens.append(input[start..i]);
+                }
+
                 in_single_quote = !in_single_quote;
                 i += 1; // Skip the quote
                 start = i; // Update start to not include the quote
             },
             '"' => {
+                if (in_double_quote) {
+                    try tokens.append(input[start..i]);
+                }
+
                 in_double_quote = !in_double_quote;
                 i += 1; // Skip the quote
                 start = i; // Update start to not include the quote
