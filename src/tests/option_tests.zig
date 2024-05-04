@@ -68,12 +68,10 @@ pub fn simpleLongOptionParseTest() !void {
     } });
     defer parser.deinit();
 
-    var sysv = std.ArrayList([]const u8).init(std.heap.page_allocator);
-    defer sysv.deinit();
-    try sysv.append("--beta");
-    try sysv.append("123");
+    const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--beta 123");
+    defer std.heap.page_allocator.free(sysv);
 
-    const args = try parser.parse(sysv);
+    const args = try parser.parseArray(sysv);
     try testz.expectEqual(args.options.items.len, 1);
     const opt = args.options.items[0];
     try testz.expectEqual(opt.name, "beta");

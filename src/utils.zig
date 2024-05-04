@@ -4,6 +4,7 @@ const StrArrayList = std.ArrayList([]const u8);
 
 pub fn tokenizeShellString(alloc: std.mem.Allocator, input: []const u8) ![][]const u8 {
     var tokens = StrArrayList.init(alloc);
+    defer tokens.deinit();
 
     var in_single_quote = false;
     var in_double_quote = false;
@@ -55,4 +56,9 @@ pub fn tokenizeShellString(alloc: std.mem.Allocator, input: []const u8) ![][]con
     }
 
     return tokens.toOwnedSlice();
+}
+
+pub fn cStrToSlice(c_str: [*:0]const u8) []const u8 {
+    const length = std.mem.len(c_str);
+    return c_str[0..length];
 }

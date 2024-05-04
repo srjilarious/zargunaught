@@ -208,7 +208,7 @@ pub const ArgParser = struct {
 
                 paramCounter += 1;
 
-                //std.debug.print("    Option param: {s}\n", .{currVal});
+                // std.debug.print("    Option param: {s}\n", .{currVal});
             }
 
             return optResult;
@@ -226,20 +226,39 @@ pub const ArgParser = struct {
                queue.first.?.data[0] == '-';
     }
 
-    pub fn parse(self: *ArgParser, args: std.ArrayList([]const u8)) !ArgParserResult 
+    pub fn parse(self: *ArgParser) !ArgParserResult 
+    {
+        var arr = std.ArrayList([]const u8).init(self.alloc);
+        defer arr.deinit();
+
+        var args = try std.process.argsWithAllocator(self.alloc);
+        _ = args.next(); // Skip the program name.
+        defer args.deinit();
+        while(true) {
+            const curr = args.next();
+            if(curr == null) break;
+
+            const argSlice = utils.cStrToSlice(curr.?);
+            try arr.append(argSlice);
+        }
+        
+        return self.parseArray(arr.items);
+    }
+
+    // Parses the array of string slices.
+    pub fn parseArray(self: *ArgParser, args: [][]const u8) !ArgParserResult 
     {
         // for (self.options.options.items) |opt| {
         //     std.debug.print("Option: --{s}, -{s}\n", .{ opt.longName, opt.shortName });
         // }
 
         var parseText = ArgQueue{};
-        for (args.items) |arg| {
+        for (args) |arg| {
             const new_node = self.alloc.create(ArgQueue.Node) catch unreachable;
             new_node.* = ArgQueue.Node{ .prev = undefined, .next = undefined, .data = arg };
             parseText.append(new_node);
         }
 
-        // TODO: fix allocator usage.
         var parseResult = ArgParserResult.init(self.alloc);
         // var lastOpt: ?OptionResult = null;
         if(parseText.len == 0) return parseResult;
@@ -275,6 +294,11 @@ pub const ArgParserResult = struct {
             .currItemPos = 0, 
             .options = std.ArrayList(OptionResult).init(allocator), 
             .positionalArgs = std.ArrayList([]const u8).init(allocator) };
+    }
+
+    pub fn deinit(self: *ArgParserResult) void {
+        self.options.deinit();
+        self.positionalArgs.deinit();
     }
 };
 
