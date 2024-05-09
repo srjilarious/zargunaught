@@ -3,6 +3,9 @@ const zargs = @import("zargunaught");
 // const fix = @import("fixtures.zig");
 const testz = @import("testz");
 
+// ----------------------------------------------------------------------------
+// Configuration Tests
+// ----------------------------------------------------------------------------
 pub fn anOptionMustHaveALongNameTest() !void {
     _ = zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Bad option configuration", .opts = &.{
         .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
@@ -61,6 +64,9 @@ pub fn aShortOptionMustBeUniqueTest() !void {
     try testz.fail();
 }
 
+// ----------------------------------------------------------------------------
+// Parsing Tests
+// ----------------------------------------------------------------------------
 pub fn simpleLongOptionParseTest() !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
         .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
@@ -77,5 +83,42 @@ pub fn simpleLongOptionParseTest() !void {
     try testz.expectEqual(opt.name, "beta");
     try testz.expectEqual(opt.values.items.len, 1);
     try testz.expectEqual(opt.values.items[0], "123");
+}
+
+pub fn simpleShortOptionParseTest() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
+        .{ .longName = "delta", .shortName = "d", .description = "", .maxNumParams = 1 },
+    } });
+    defer parser.deinit();
+
+    // Test first short option
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-b 123");
+        defer std.heap.page_allocator.free(sysv);
+
+        var args = try parser.parseArray(sysv);
+        defer args.deinit();
+
+        try testz.expectEqual(args.options.items.len, 1);
+        const opt = args.options.items[0];
+        try testz.expectEqual(opt.name, "beta");
+        try testz.expectEqual(opt.values.items.len, 1);
+        try testz.expectEqual(opt.values.items[0], "123");
+    }
+
+    // Test second short option
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-d 234");
+        defer std.heap.page_allocator.free(sysv);
+        var args = try parser.parseArray(sysv);
+        defer args.deinit();
+
+        try testz.expectEqual(args.options.items.len, 1);
+        const opt = args.options.items[0];
+        try testz.expectEqual(opt.name, "delta");
+        try testz.expectEqual(opt.values.items.len, 1);
+        try testz.expectEqual(opt.values.items[0], "234");
+    }
 }
 
