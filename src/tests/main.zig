@@ -5,6 +5,7 @@ const testz = @import("testz");
 const Tests = testz.discoverTests(.{
     @import("./utils_tests.zig"),
     @import("./option_tests.zig"),
+    @import("./command_tests.zig"),
 });
 
 pub fn main() void {

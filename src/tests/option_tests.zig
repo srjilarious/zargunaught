@@ -80,9 +80,9 @@ pub fn simpleLongOptionParseTest() !void {
     const args = try parser.parseArray(sysv);
     try testz.expectEqual(args.options.items.len, 1);
     const opt = args.options.items[0];
-    try testz.expectEqual(opt.name, "beta");
+    try testz.expectEqualStr(opt.name, "beta");
     try testz.expectEqual(opt.values.items.len, 1);
-    try testz.expectEqual(opt.values.items[0], "123");
+    try testz.expectEqualStr(opt.values.items[0], "123");
 }
 
 pub fn simpleShortOptionParseTest() !void {
@@ -97,28 +97,35 @@ pub fn simpleShortOptionParseTest() !void {
         const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-b 123");
         defer std.heap.page_allocator.free(sysv);
 
-        var args = try parser.parseArray(sysv);
+        var args = parser.parseArray(sysv) catch |err| {
+            try testz.failWith(err);
+            return;
+        };
         defer args.deinit();
 
         try testz.expectEqual(args.options.items.len, 1);
         const opt = args.options.items[0];
-        try testz.expectEqual(opt.name, "beta");
+        try testz.expectEqualStr(opt.name, "beta");
         try testz.expectEqual(opt.values.items.len, 1);
-        try testz.expectEqual(opt.values.items[0], "123");
+        try testz.expectEqualStr(opt.values.items[0], "123");
     }
 
     // Test second short option
     {
         const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-d 234");
         defer std.heap.page_allocator.free(sysv);
-        var args = try parser.parseArray(sysv);
+
+        var args = parser.parseArray(sysv) catch |err| {
+            try testz.failWith(err);
+            return;
+        };
+
         defer args.deinit();
 
         try testz.expectEqual(args.options.items.len, 1);
         const opt = args.options.items[0];
-        try testz.expectEqual(opt.name, "delta");
+        try testz.expectEqualStr(opt.name, "delta");
         try testz.expectEqual(opt.values.items.len, 1);
-        try testz.expectEqual(opt.values.items[0], "234");
+        try testz.expectEqualStr(opt.values.items[0], "234");
     }
 }
-

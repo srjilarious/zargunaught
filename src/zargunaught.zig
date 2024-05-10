@@ -38,15 +38,15 @@ pub const OptionResult = struct {
 };
 
 pub const OptionList = struct {
-    options: std.ArrayList(Option),
+    data: std.ArrayList(Option),
 
     pub fn init(allocator: std.mem.Allocator) OptionList {
         const options = std.ArrayList(Option).init(allocator);
-        return OptionList{ .options = options };
+        return OptionList{ .data = options };
     }
 
     pub fn deinit(self: OptionList) void {
-        self.options.deinit();
+        self.data.deinit();
     }
 
     pub fn addOptions(self: *OptionList, opts: []const Option) ParserConfigError!void {
@@ -68,7 +68,7 @@ pub const OptionList = struct {
             return ParserConfigError.OptionBeginsWithNumber;
         }
 
-        for (self.options.items) |o| {
+        for (self.data.items) |o| {
             if (std.mem.eql(u8, opt.longName, o.longName)) {
                 return ParserConfigError.DuplicateOption;
             }
@@ -78,11 +78,11 @@ pub const OptionList = struct {
             }
         }
 
-        self.options.append(opt) catch unreachable;
+        self.data.append(opt) catch unreachable;
     }
 
-    pub fn findLongOption(self: *OptionList, optName: []const u8) ?Option {
-        for (self.options.items) |opt| {
+    pub fn findLongOption(self: *const OptionList, optName: []const u8) ?Option {
+        for (self.data.items) |opt| {
             if (std.mem.eql(u8, opt.longName, optName)) {
                 return opt;
             }
@@ -91,8 +91,8 @@ pub const OptionList = struct {
         return null;
     }
 
-    pub fn findShortOption(self: *OptionList, optName: []const u8) ?Option {
-        for (self.options.items) |opt| {
+    pub fn findShortOption(self: *const OptionList, optName: []const u8) ?Option {
+        for (self.data.items) |opt| {
             if (std.mem.eql(u8, opt.shortName, optName)) {
                 return opt;
             }
@@ -104,8 +104,62 @@ pub const OptionList = struct {
 
 pub const Command = struct { 
     name: []const u8, 
-    description: []const u8,
+    description: ?[]const u8,
     options: OptionList 
+};
+
+pub const CommandList = struct {
+    data: std.ArrayList(Command),
+
+    pub fn init(allocator: std.mem.Allocator) CommandList {
+        const data  = std.ArrayList(Command).init(allocator);
+        return CommandList{ .data = data };
+    }
+
+    pub fn deinit(self: CommandList) void {
+        for(self.data.items) |cmd| {
+            cmd.options.deinit();
+        }
+
+        self.data.deinit();
+    }
+
+    pub fn addMany(self: *CommandList, cmds: []const Command) ParserConfigError!void {
+        for (cmds) |c| {
+            try self.add(c);
+        }
+    }
+
+    pub fn add(self: *CommandList, cmd: Command) ParserConfigError!void {
+        if (cmd.name.len == 0) {
+            return ParserConfigError.CommandNameMissing;
+        }
+
+        for (self.data.items) |c| {
+            if (std.mem.eql(u8, cmd.name, c.name)) {
+                return ParserConfigError.DuplicateOption;
+            }
+        }
+
+        self.data.append(cmd) catch unreachable;
+    }
+
+    pub fn find(self: *CommandList, cmdName: []const u8) ?Command {
+        for (self.data.items) |cmd| {
+            if (std.mem.eql(u8, cmd.name, cmdName)) {
+                return cmd;
+            }
+        }
+
+        return null;
+    }
+};
+
+pub const CommandOpt = struct {
+    name: []const u8,
+    description: ?[]const u8 = null,
+    // group: ?[]const u8,
+    opts: ?[]const Option = null,
 };
 
 pub const ArgParserOpts = struct {
@@ -114,6 +168,7 @@ pub const ArgParserOpts = struct {
     description: ?[]const u8 = null,
     usage: ?[]const u8 = null,
     opts: ?[]const Option = null,
+    commands: ?[] const CommandOpt = null,
 };
 
 pub const ArgParser = struct {
@@ -122,6 +177,7 @@ pub const ArgParser = struct {
     description: ?[]const u8,
     usage: ?[]const u8,
     options: OptionList,
+    commands: CommandList,
     alloc: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, opts: ArgParserOpts) !ArgParser {
@@ -131,6 +187,7 @@ pub const ArgParser = struct {
             .description = opts.description, 
             .usage = opts.usage, 
             .options = OptionList.init(allocator),
+            .commands = CommandList.init(allocator),
             .alloc = allocator
         };
 
@@ -142,11 +199,27 @@ pub const ArgParser = struct {
             try argsParser.options.addOptions(opts.opts.?);
         }
 
+        if(opts.commands != null) {
+            for(opts.commands.?) |cmd| {
+                var cmdItem: Command = .{
+                    .name=cmd.name,
+                    .description=cmd.description,
+                    .options=OptionList.init(allocator)
+                };
+
+                if(cmd.opts != null) {
+                    try cmdItem.options.addOptions(cmd.opts.?);
+                }
+
+                try argsParser.commands.data.append(cmdItem);
+            }
+        }
         return argsParser;
     }
 
     pub fn deinit(self: ArgParser) void {
         self.options.deinit();
+        self.commands.deinit();
     }
 
     pub fn description(self: *ArgParser, desc: []const u8) *ArgParser {
@@ -164,7 +237,7 @@ pub const ArgParser = struct {
         return self;
     }
 
-    fn parseOption(self: *ArgParser, parseText: *ArgQueue, parseResult: *ArgParserResult) ParseError!?OptionResult {
+    fn parseOption(parseText: *ArgQueue, parseResult: *ArgParserResult, availableOpts: *const OptionList) ParseError!?OptionResult {
         if (parseText.len == 0) return null;
 
         const optFullName = parseText.first.?.data;
@@ -182,8 +255,7 @@ pub const ArgParser = struct {
 
         if (optFullName[0] == '-' and optFullName[1] == '-') {
             optName = optFullName[2..];
-            // TODO Add looking for command option..
-            opt = self.options.findLongOption(optName);
+            opt = availableOpts.findLongOption(optName);
         }
 
         _ = parseText.popFirst();
@@ -219,7 +291,7 @@ pub const ArgParser = struct {
         return null;
     }
 
-    fn isNextItemLikelyAnOption(queue: *ArgQueue) bool {
+    fn isNextItemLikelyAnOption(queue: *const ArgQueue) bool {
         return queue.len > 0 and 
                queue.first != null and 
                queue.first.?.data.len > 0 and
@@ -245,6 +317,22 @@ pub const ArgParser = struct {
         return self.parseArray(arr.items);
     }
 
+    // TODO: Add in returning state for case where we hit `-`
+    pub fn parseArgsForOptions(parseResult: *ArgParserResult, availableOpts: *const OptionList, parseText: *ArgQueue) !void
+    {
+        while (isNextItemLikelyAnOption(parseText)) {
+            // Check if we ran into a number
+            const frontData = parseText.first.?.data;
+            if (frontData.len > 1 and std.ascii.isDigit(frontData[1])) break;
+
+            // TODO: change to catching and adding a better error.
+            const optRes = try parseOption(parseText, parseResult, availableOpts);
+            if(optRes == null) break;
+
+            try parseResult.options.append(optRes.?);
+        }
+    }
+
     // Parses the array of string slices.
     pub fn parseArray(self: *ArgParser, args: [][]const u8) !ArgParserResult 
     {
@@ -263,21 +351,29 @@ pub const ArgParser = struct {
         // var lastOpt: ?OptionResult = null;
         if(parseText.len == 0) return parseResult;
 
-        while (isNextItemLikelyAnOption(&parseText)) {
-            // Check if we ran into a number
-            const frontData = parseText.first.?.data;
-            if (frontData.len > 1 and std.ascii.isDigit(frontData[1])) break;
-
-            // TODO: change to catching and adding a better error.
-            const optRes = try self.parseOption(&parseText, &parseResult);
-            if(optRes == null) break;
-
-            try parseResult.options.append(optRes.?);
-        }
+        try parseArgsForOptions(&parseResult, &self.options, &parseText);
 
         if(parseText.len == 0) return parseResult;
 
         // Setup command list.
+        const frontData = parseText.first.?.data;
+
+        // Handle looking for commands after any initial global options.
+        for(0..self.commands.data.items.len) |cmdIdx| {
+            const cmd: *Command = &self.commands.data.items[cmdIdx];
+            if(std.mem.eql(u8, cmd.name, frontData)) {
+                parseResult.command = cmd;
+
+                // Create a temporary option list to use to find combined global and command level options.
+                var availableOpts = OptionList.init(self.alloc);
+                defer availableOpts.deinit();
+
+                try availableOpts.addOptions(self.options.data.items);
+                try availableOpts.addOptions(cmd.options.data.items);
+
+                try parseArgsForOptions(&parseResult, &availableOpts, &parseText);
+            }
+        }
 
         return parseResult;
     }
@@ -287,12 +383,14 @@ pub const ArgParserResult = struct {
     // optionsList: OptionList, // Subparser options
     currItemPos: usize,
     options: std.ArrayList(OptionResult),
+    command: ?*Command,
     positionalArgs: std.ArrayList([]const u8),
 
     pub fn init(allocator: std.mem.Allocator) ArgParserResult {
         return .{ 
             .currItemPos = 0, 
-            .options = std.ArrayList(OptionResult).init(allocator), 
+            .options = std.ArrayList(OptionResult).init(allocator),
+            .command = null,
             .positionalArgs = std.ArrayList([]const u8).init(allocator) };
     }
 

@@ -6,7 +6,7 @@ const testz = @import("testz");
 fn compareStrArrays(expected: []const []const u8, result: []const []const u8) !void {
     try testz.expectEqual(expected.len, result.len);
     for (0..expected.len) |idx| {
-        try testz.expectEqual(expected[idx], result[idx]);
+        try testz.expectEqualStr(expected[idx], result[idx]);
     }
 }
 
