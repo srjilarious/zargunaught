@@ -257,6 +257,10 @@ pub const ArgParser = struct {
             optName = optFullName[2..];
             opt = availableOpts.findLongOption(optName);
         }
+        else if (optFullName[0] == '-') {
+            optName = optFullName[1..];
+            opt = availableOpts.findShortOption(optName);
+        }
 
         _ = parseText.popFirst();
         parseResult.currItemPos += 1;
