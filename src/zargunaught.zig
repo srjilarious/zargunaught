@@ -368,6 +368,8 @@ pub const ArgParser = struct {
             if(std.mem.eql(u8, cmd.name, frontData)) {
                 parseResult.command = cmd;
 
+                _ = parseText.popFirst();
+
                 // Create a temporary option list to use to find combined global and command level options.
                 var availableOpts = OptionList.init(self.alloc);
                 defer availableOpts.deinit();
