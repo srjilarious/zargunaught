@@ -404,6 +404,14 @@ pub const ArgParserResult = struct {
         self.options.deinit();
         self.positionalArgs.deinit();
     }
+
+    pub fn hasOption(self: *ArgParserResult, name: []const u8) bool {
+        for(self.options.items) |o| {
+            if(std.mem.eql(u8, o.name, name)) return true;
+        }
+
+        return false;
+    }
 };
 
 

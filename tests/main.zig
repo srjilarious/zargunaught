@@ -9,7 +9,5 @@ const Tests = testz.discoverTests(.{
 });
 
 pub fn main() !void {
-    const verbose = if (std.os.argv.len > 1 and std.mem.eql(u8, "verbose", std.mem.span(std.os.argv[1]))) true else false;
-
-    _ = try testz.runTests(Tests, .{ .verbose = verbose });
+    try testz.testzRunner(Tests);
 }

@@ -15,31 +15,25 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    // const lib = b.addStaticLibrary(.{
-    //     .name = "zargunaught",
-    //     // In this case the main source file is merely a path, however, in more
-    //     // complicated build scripts, this could be a generated file.
-    //     .root_source_file = b.path("src/zargunaught.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-
-    const module = b.addModule("zargunaught", .{
+    const zargsMod = b.addModule("zargunaught", .{
         .root_source_file = .{ .path = "src/zargunaught.zig" },
     });
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    //b.installArtifact(lib);
 
+    _ = addExample(b, target, optimize, "basic", "examples/basic.zig", zargsMod);
+
+    var testsExe = addExample(b, target, optimize, "unit_tests", "tests/main.zig", zargsMod);
+    const testzMod = b.dependency("testz", .{});
+    testsExe.root_module.addImport("testz", testzMod.module("testz"));
+}
+
+fn addExample(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, comptime name: []const u8, root_src_path: []const u8, zargsMod: *std.Build.Module) *std.Build.Step.Compile {
     const exe = b.addExecutable(.{
-        .name = "zargs_basic",
-        .root_source_file = b.path("src/main.zig"),
+        .name = name,
+        .root_source_file = b.path(root_src_path),
         .target = target,
         .optimize = optimize,
     });
-    exe.root_module.addImport("zargunaught", module);
-    // exe.root_module.addImport("testz", module);
+    exe.root_module.addImport("zargunaught", zargsMod);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -66,44 +60,7 @@ pub fn build(b: *std.Build) void {
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build run`
     // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
+    const run_step = b.step(name, "Run " ++ name ++ " example");
     run_step.dependOn(&run_cmd.step);
-
-    const tests_exe = b.addExecutable(.{
-        .name = "zargs_tests",
-        .root_source_file = b.path("src/tests/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    tests_exe.root_module.addImport("zargunaught", module);
-    const testzMod = b.dependency("testz", .{});
-    tests_exe.root_module.addImport("testz", testzMod.module("testz"));
-
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
-    b.installArtifact(tests_exe);
-
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-    const run_tests_cmd = b.addRunArtifact(tests_exe);
-
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_tests_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_tests_cmd.addArgs(args);
-    }
-
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_tests_step = b.step("tests", "Run the app tests");
-    run_tests_step.dependOn(&run_tests_cmd.step);
+    return exe;
 }
