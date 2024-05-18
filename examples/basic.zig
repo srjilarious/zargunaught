@@ -18,7 +18,15 @@ fn basicOptionParsing() !void {
                 Option{ .longName = "alpha", .shortName = "a", .description = "", .maxNumParams = 0 },
                 Option{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
                 Option{ .longName = "gamma", .shortName = "g", .description = "", .maxNumParams = -1 },
-            } 
+            },
+            .commands = &.{
+            .{ .name = "help", .description = "Prints out this help." },
+            .{ .name = "transmogrify", 
+               .opts = &.{
+                    .{ .longName = "into", .shortName = "i", .description = "", .maxNumParams = 1 }
+                }
+            }
+        }
         });
     defer parser.deinit();
 
@@ -28,10 +36,22 @@ fn basicOptionParsing() !void {
     };
     defer args.deinit();
 
-    for (args.options.items) |opt| {
-        std.debug.print("Got option: {s}\n", .{opt.name});
-        for (opt.values.items) |val| {
-            std.debug.print("  - {s}\n", .{val});
+    if(args.command != null) {
+        if(std.mem.eql(u8, args.command.?.name, "help")) {
+            var stdout = zargs.print.Printer.debug();
+            var help = zargs.help.HelpFormatter.init(&parser, stdout);
+            help.printHelpText() catch |err| {
+                std.debug.print("Err: {any}\n", .{err});
+            };
+            try stdout.flush();
+        }
+    }
+    else {
+        for (args.options.items) |opt| {
+            std.debug.print("Got option: {s}\n", .{opt.name});
+            for (opt.values.items) |val| {
+                std.debug.print("  - {s}\n", .{val});
+            }
         }
     }
 

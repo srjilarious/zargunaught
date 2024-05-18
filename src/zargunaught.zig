@@ -3,6 +3,8 @@ const std = @import("std");
 const ArgQueue = std.TailQueue([]const u8);
 
 pub const utils = @import("./utils.zig");
+pub const help = @import("./helptext.zig");
+pub const print = @import("./printer.zig");
 
 pub const ParserConfigError = error{ 
     LongOptionNameMissing,
@@ -222,20 +224,20 @@ pub const ArgParser = struct {
         self.commands.deinit();
     }
 
-    pub fn description(self: *ArgParser, desc: []const u8) *ArgParser {
-        self.description = desc;
-        return self;
-    }
-
-    pub fn usage(self: *ArgParser, use: []const u8) *ArgParser {
-        self.usage = use;
-        return self;
-    }
-
-    pub fn withOptions(self: *ArgParser, opts: []const Option) ParserConfigError!*ArgParser {
-        try self.options.addOptions(opts);
-        return self;
-    }
+    // pub fn description(self: *ArgParser, desc: []const u8) *ArgParser {
+    //     self.description = desc;
+    //     return self;
+    // }
+    //
+    // pub fn usage(self: *ArgParser, use: []const u8) *ArgParser {
+    //     self.usage = use;
+    //     return self;
+    // }
+    //
+    // pub fn withOptions(self: *ArgParser, opts: []const Option) ParserConfigError!*ArgParser {
+    //     try self.options.addOptions(opts);
+    //     return self;
+    // }
 
     fn parseOption(parseText: *ArgQueue, parseResult: *ArgParserResult, availableOpts: *const OptionList) ParseError!?OptionResult {
         if (parseText.len == 0) return null;
