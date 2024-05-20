@@ -2,8 +2,9 @@
 const std = @import("std");
 
 const FilePrinterData = struct {
+    alloc: std.mem.Allocator,
     file: std.fs.File,
-    bufferWriter: std.io.BufferedWriter(4096, std.fs.File.Writer)
+    bufferWriter: std.io.BufferedWriter(4096, std.fs.File.Writer),
 };
 
 const ArrayPrinterData = struct {
@@ -14,24 +15,23 @@ const ArrayPrinterData = struct {
 
 // An adapter for printing either to an ArrayList or to a File like stdout.
 pub const Printer = union(enum) {
-    file: FilePrinterData,
+    file: *FilePrinterData,
     array: *ArrayPrinterData,
     debug: bool,
     
-    pub fn stdout() Printer {
-        var f: FilePrinterData = .{ 
-            .file = std.io.getStdOut(),
-            .bufferWriter = undefined
-        };
+    pub fn stdout(alloc: std.mem.Allocator) !Printer {
+        var f = try alloc.create(FilePrinterData);
+        f.alloc = alloc;
+        f.file = std.io.getStdOut();
         f.bufferWriter = std.io.bufferedWriter(f.file.writer());
         return .{.file = f};
     }
 
     pub fn memory(alloc: std.mem.Allocator) !Printer {
-        var a: *ArrayPrinterData = try alloc.create(ArrayPrinterData);
-        a.*.alloc = alloc;
-        a.*.array = std.ArrayList(u8).init(alloc);
-        a.*.bufferWriter = std.io.bufferedWriter(a.array.writer());
+        var a = try alloc.create(ArrayPrinterData);
+        a.alloc = alloc;
+        a.array = std.ArrayList(u8).init(alloc);
+        a.bufferWriter = std.io.bufferedWriter(a.array.writer());
         return .{.array = a};
     }
 
@@ -42,8 +42,11 @@ pub const Printer = union(enum) {
     pub fn deinit(self: *Printer) void {
         switch(self.*) {
             .array => |arr| {
-                arr.*.array.deinit();
-                arr.*.alloc.destroy(self.array);
+                arr.array.deinit();
+                arr.alloc.destroy(self.array);
+            },
+            .file => |f| {
+                f.alloc.destroy(self.file);
             },
             else => {}
         }

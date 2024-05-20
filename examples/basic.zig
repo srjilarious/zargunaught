@@ -38,7 +38,7 @@ fn basicOptionParsing() !void {
 
     if(args.command != null) {
         if(std.mem.eql(u8, args.command.?.name, "help")) {
-            var stdout = zargs.print.Printer.debug();
+            var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
             var help = zargs.help.HelpFormatter.init(&parser, stdout);
             help.printHelpText() catch |err| {
                 std.debug.print("Err: {any}\n", .{err});
