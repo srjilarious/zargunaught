@@ -15,15 +15,15 @@ fn basicOptionParsing() !void {
             .name = "Test program", 
             .description = "A cool test program", 
             .opts = &[_]Option{
-                Option{ .longName = "alpha", .shortName = "a", .description = "", .maxNumParams = 0 },
-                Option{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
-                Option{ .longName = "gamma", .shortName = "g", .description = "", .maxNumParams = -1 },
+                Option{ .longName = "alpha", .shortName = "a", .description = "The first option", .maxNumParams = 0 },
+                Option{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
+                Option{ .longName = "gamma", .shortName = "g", .description = "The last option here.", .maxNumParams = -1 },
             },
             .commands = &.{
             .{ .name = "help", .description = "Prints out this help." },
             .{ .name = "transmogrify", 
                .opts = &.{
-                    .{ .longName = "into", .shortName = "i", .description = "", .maxNumParams = 1 }
+                    .{ .longName = "into", .shortName = "i", .description = "What you want to transform into.", .maxNumParams = 1 }
                 }
             }
         }
@@ -39,7 +39,7 @@ fn basicOptionParsing() !void {
     if(args.command != null) {
         if(std.mem.eql(u8, args.command.?.name, "help")) {
             var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
-            var help = zargs.help.HelpFormatter.init(&parser, stdout);
+            var help = zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme);
             help.printHelpText() catch |err| {
                 std.debug.print("Err: {any}\n", .{err});
             };
