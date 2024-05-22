@@ -38,21 +38,27 @@ const DashType = enum {
 
 pub const HelpTheme = struct {
     banner: Style,
+    progDescription: Style,
+    usage: Style,
     optionName: Style,
     commandName: Style,
     groupName: Style,
+    optionDash: Style,
     optionSeparator: Style,
     separator: Style,
     description: Style,
 };
 
 pub const DefaultTheme: HelpTheme = .{
-    .banner = .{ .fg = .BrightBlue, .bg = .Reset, .mod = .{ .underline = true } },
-    .optionName = .{ .fg = .Cyan, .bg = . Reset, .mod = .{} },
-    .commandName = .{ .fg = .Yellow, .bg = . Reset, .mod = .{} },
-    .groupName = .{ .fg = .Blue, .bg = . Reset, .mod = .{ .underline = true } },
-    .optionSeparator = .{ .fg = .Cyan, .bg = . Reset, .mod = .{ .dim = true } },
-    .separator = .{ .fg = .Reset, .bg = . Reset, .mod = .{ .dim = true } },
+    .banner = .{ .fg = .BrightYellow, .bg = .Reset, .mod = .{ .bold = true } },
+    .progDescription = .{ .fg = .BrightWhite, .bg = .Reset, .mod = .{ } },
+    .usage = .{ .fg = .Reset , .bg = .Reset, .mod = .{ .italic = true } },
+    .optionName = .{ .fg = .Cyan, .bg = . Reset, .mod = .{ .bold = true } },
+    .commandName = .{ .fg = .BrightBlue, .bg = . Reset, .mod = .{ .bold = true } },
+    .groupName = .{ .fg = .BrightGreen, .bg = . Reset, .mod = .{ .underline = true } },
+    .optionDash = .{ .fg = .Cyan, .bg = . Reset, .mod = .{ .dim = true } },
+    .optionSeparator = .{ .fg = .White, .bg = . Reset, .mod = .{ .dim = true } },
+    .separator = .{ .fg = .White, .bg = . Reset, .mod = .{ .dim = true } },
     .description = .{ .fg = .Reset, .bg = . Reset, .mod = .{} },
 };
 
@@ -81,6 +87,7 @@ pub const HelpFormatter = struct
 
     pub fn printHelpText(self: *HelpFormatter) !void
     {
+        try self.newLine();
         try self.theme.banner.set(self.printer);
         if(self.args.banner != null) {
             try self.printer.print("{?s}", .{self.args.banner});
@@ -89,8 +96,25 @@ pub const HelpFormatter = struct
             try self.printer.print("{s}", .{self.args.name});
         }
 
+        if(self.args.description != null) {
+            try self.theme.separator.set(self.printer);
+            try self.printer.print(" - ", .{});
+
+            try self.theme.progDescription.set(self.printer);
+            try self.printer.print("{?s}", .{self.args.description});
+        }
+
         try self.newLine();
-        try self.newLine();
+
+        if(self.args.usage != null) {
+            try self.newLine();
+            
+            try self.theme.usage.set(self.printer);
+            try self.printer.print("{?s}", .{self.args.usage});
+            
+            try self.newLine();
+            try self.newLine();
+        }
 
         try self.theme.groupName.set(self.printer);
         try self.printer.print("Global Options", .{});
@@ -134,8 +158,9 @@ pub const HelpFormatter = struct
 
                 try self.theme.description.set(self.printer);
                 try self.printer.print("{?s}", .{com.description});
-                try self.newLine();
             }
+
+            try self.newLine();
 
             // Check the command options as well
             for(com.options.data.items) |opt| {
@@ -162,16 +187,18 @@ pub const HelpFormatter = struct
 
     fn optionHelpName(self: *HelpFormatter, opt: *const Option) !void
     {
-        try self.theme.optionName.set(self.printer);
+        try self.theme.optionDash.set(self.printer);
         try self.optionDash(.Long);
+        try self.theme.optionName.set(self.printer);
         try self.printer.print("{s}", .{opt.longName});
 
         if(opt.shortName.len > 0) {
             try self.theme.optionSeparator.set(self.printer);
             try self.printer.print(", ", .{});
         
-            try self.theme.optionName.set(self.printer);
+            try self.theme.optionDash.set(self.printer);
             try self.optionDash(.Short);
+            try self.theme.optionName.set(self.printer);
             try self.printer.print("{s}", .{opt.shortName});
         }
     }

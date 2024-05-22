@@ -9,11 +9,12 @@ pub fn main() !void {
 }
 
 fn basicOptionParsing() !void {
-    std.debug.print("Basic option parsing...\n", .{});
+    // std.debug.print("Basic option parsing...\n", .{});
     var parser = try zargs.ArgParser.init(
         std.heap.page_allocator, .{ 
-            .name = "Test program", 
-            .description = "A cool test program", 
+            .name = "Test program",
+            .description = "A cool test program",
+            .usage = "Mostly used to transmogrify a thing into a thing.",
             .opts = &[_]Option{
                 Option{ .longName = "alpha", .shortName = "a", .description = "The first option", .maxNumParams = 0 },
                 Option{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
