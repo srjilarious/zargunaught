@@ -9,13 +9,24 @@ const ArgParser = zargs.ArgParser;
 const Option = zargs.Option;
 const Command = zargs.Command;
 
+fn optionHelpNameLength(opt: *const Option) usize {
+    // + 2 for the dashes
+    var optLen = opt.longName.len + 2;
+    if(opt.shortName.len > 0) {
+        // 2 for the ', ' and 1 for the dash
+        optLen += opt.shortName.len + 2 + 1;
+    }
+
+    return optLen;
+}
+
 pub fn findMaxOptComLength(argsConf: *const ArgParser) usize
 {
     var currMax: usize = 0;
 
     // Look at global options
     for(argsConf.options.data.items) |opt| {
-        currMax = @max(opt.longName.len, currMax);
+        currMax = @max(optionHelpNameLength(&opt), currMax);
     }
 
     // Check the commands too
@@ -24,7 +35,8 @@ pub fn findMaxOptComLength(argsConf: *const ArgParser) usize
 
         // Check the command options as well
         for(com.options.data.items) |opt| {
-            currMax = @max(opt.name.len, currMax);
+            // Account for extra 2 indentation for command options.
+            currMax = @max(optionHelpNameLength(&opt) + 2, currMax);
         }
     }
 
@@ -87,6 +99,8 @@ pub const HelpFormatter = struct
 
     pub fn printHelpText(self: *HelpFormatter) !void
     {
+        const maxOptComLen = findMaxOptComLength(self.args);
+
         try self.newLine();
         try self.theme.banner.set(self.printer);
         if(self.args.banner != null) {
@@ -127,9 +141,10 @@ pub const HelpFormatter = struct
             try self.printer.print("  ", .{});
 
             try self.theme.optionName.set(self.printer);
-            try self.optionHelpName(&opt);
+            const optLen = try self.optionHelpName(&opt);
 
             try self.theme.separator.set(self.printer);
+            try self.printer.printNum(" ", maxOptComLen - optLen);
             try self.printer.print(": ", .{});
 
             try self.theme.description.set(self.printer);
@@ -154,6 +169,8 @@ pub const HelpFormatter = struct
             // Print out the command description if there is one.
             if(com.description != null) {
                 try self.theme.separator.set(self.printer);
+                // Account for command not having dashes.
+                try self.printer.printNum(" ", maxOptComLen - com.name.len + 2);
                 try self.printer.print(": ", .{});
 
                 try self.theme.description.set(self.printer);
@@ -168,10 +185,14 @@ pub const HelpFormatter = struct
                 try self.printer.print("    ", .{});
 
                 try self.theme.optionName.set(self.printer);
-                try self.optionHelpName(&opt);
+                const optLen = try self.optionHelpName(&opt);
 
                 try self.theme.separator.set(self.printer);
+
+                // Account for extra 2 indentation for command option.
+                try self.printer.printNum(" ", maxOptComLen - optLen - 2);
                 try self.printer.print(": ", .{});
+
 
                 try self.theme.description.set(self.printer);
                 try self.printer.print("{s}", .{opt.description});
@@ -185,12 +206,14 @@ pub const HelpFormatter = struct
     //
     // }
 
-    fn optionHelpName(self: *HelpFormatter, opt: *const Option) !void
+    fn optionHelpName(self: *HelpFormatter, opt: *const Option) !usize
     {
+        var amount: usize = 0;
         try self.theme.optionDash.set(self.printer);
         try self.optionDash(.Long);
         try self.theme.optionName.set(self.printer);
         try self.printer.print("{s}", .{opt.longName});
+        amount += opt.longName.len + 2;
 
         if(opt.shortName.len > 0) {
             try self.theme.optionSeparator.set(self.printer);
@@ -200,7 +223,10 @@ pub const HelpFormatter = struct
             try self.optionDash(.Short);
             try self.theme.optionName.set(self.printer);
             try self.printer.print("{s}", .{opt.shortName});
+            amount += opt.shortName.len + 1;
         }
+
+        return amount;
     }
 
     // fn optionHelpNameLength(self: *HelpFormatter) usize

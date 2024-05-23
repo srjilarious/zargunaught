@@ -165,6 +165,14 @@ pub const Printer = union(enum) {
         }
     }
 
+    pub fn printNum(self: *const Printer, s: []const u8, num: usize) !void {
+        var n = num;
+        while (n > 0) {
+            try self.print("{s}", .{s});
+            n -= 1;
+        }
+    }
+
     pub fn flush(self: *const Printer) anyerror!void
     {
         switch(self.*) {
