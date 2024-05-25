@@ -195,7 +195,13 @@ pub const HelpFormatter = struct
 
 
                 try self.theme.description.set(self.printer);
-                try self.printer.print("{s}", .{opt.description});
+                // try self.printer.print("{s}", .{opt.description});
+                _ = try self.printer.printWrapped(
+                        opt.description,
+                        maxOptComLen + 2 + 4,
+                        maxOptComLen + 2 + 4,
+                        80
+                    );
                 try self.newLine();
             }
         }

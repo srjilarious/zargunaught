@@ -24,7 +24,7 @@ fn basicOptionParsing() !void {
             .{ .name = "help", .description = "Prints out this help." },
             .{ .name = "transmogrify", 
                .opts = &.{
-                    .{ .longName = "into", .shortName = "i", .description = "What you want to transform into.", .maxNumParams = 1 }
+                    .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 }
                 }
             }
         }
@@ -38,14 +38,21 @@ fn basicOptionParsing() !void {
     defer args.deinit();
 
     if(args.command != null) {
+        var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
         if(std.mem.eql(u8, args.command.?.name, "help")) {
-            var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
             var help = zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme);
             help.printHelpText() catch |err| {
                 std.debug.print("Err: {any}\n", .{err});
             };
-            try stdout.flush();
         }
+
+        else if(std.mem.eql(u8, args.command.?.name, "transmogrify")) {
+            // TODO: add API to make this cleaner.
+            const into = args.options.items[0].values.items[0];
+            try stdout.print("Turning you into {s}!!\n", .{into});
+        }
+
+        try stdout.flush();
     }
     else {
         for (args.options.items) |opt| {

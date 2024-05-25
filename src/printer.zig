@@ -181,4 +181,60 @@ pub const Printer = union(enum) {
             .debug => {},
         }
     }
+
+    
+    pub fn printWrapped(
+            self: *Printer, 
+            value: []const u8, 
+            startLineLen: usize, 
+            currIndentAmount: usize, 
+            maxLineLength: usize
+        ) !usize 
+    {
+        var start: usize = 0;
+        var currLineLen = startLineLen;
+        var prevWordLoc: usize = 0;
+
+        var idx: usize = 0;
+        while(idx < value.len) {
+            if(value[idx] == ' ') {
+                prevWordLoc = idx;
+            }
+            else if(value[idx] == '\n') {
+                try self.print("{s}", .{value[start..idx]});
+                try self.printNum(" ", currIndentAmount);
+                currLineLen = currIndentAmount;
+                start = idx + 1;
+                idx += 1;
+            }
+
+            if((currLineLen + idx - start) >= maxLineLength) {
+                // hyphenation here.
+                if(start >= prevWordLoc) {
+                    try self.print("{s}-\n", .{value[start..idx-1]});
+                    try self.printNum(" ", currIndentAmount);
+                    currLineLen = currIndentAmount;
+                    start = idx - 1;
+                    prevWordLoc = start;
+                } 
+                // word wrap break
+                else {
+                    try self.print("{s}\n", .{value[start..prevWordLoc]});
+                    try self.printNum(" ", currIndentAmount);
+                    currLineLen = currIndentAmount;
+                    start = prevWordLoc + 1;
+                }
+            }
+
+            idx += 1;
+        }
+
+        // TODO: add print rest of value in word wrap case.
+        //if((currLineLen + left) >= maxLine)
+        const left: usize = value.len - start;
+        try self.print("{s}", .{value[start..start+left]});
+        currLineLen += left;
+
+        return currLineLen;
+    }
 };
