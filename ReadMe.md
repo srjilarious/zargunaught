@@ -1,4 +1,7 @@
-# Zargunaught
+# Overview
+
+![Zig Version](https://img.shields.io/badge/Zig%20Version-0.13.0-%23f7a41d?logo=zig)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 Zargunaught is an argument parsing library for zig, based off of my earlier `argunaught` C++ library.  It features a simple API for configuring global options, commands and command specific options.
 
