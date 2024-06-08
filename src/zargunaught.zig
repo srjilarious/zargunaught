@@ -420,6 +420,28 @@ pub const ArgParserResult = struct {
 
         return false;
     }
+
+    pub fn option(self: *ArgParserResult, optName: []const u8) ?*OptionResult {
+        for(0..self.options.items.len) |idx| {
+            const o = &self.options.items[idx];
+            if(std.mem.eql(u8, o.name, optName)) {
+                return o;
+            }
+        }
+
+        return null;
+    }
+
+    // Get the first value if it exists.
+    pub fn optionVal(self: *ArgParserResult, optName: []const u8) ?[]const u8 {
+        if(self.option(optName)) |o| {
+            if(o.values.items.len > 0) {
+                return o.values.items[0];
+            }
+        }
+
+        return null;
+    }
 };
 
 

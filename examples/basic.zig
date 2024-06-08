@@ -47,9 +47,12 @@ fn basicOptionParsing() !void {
         }
 
         else if(std.mem.eql(u8, args.command.?.name, "transmogrify")) {
-            // TODO: add API to make this cleaner.
-            const into = args.options.items[0].values.items[0];
-            try stdout.print("Turning you into {s}!!\n", .{into});
+            if(args.optionVal("into")) |into| {
+                try stdout.print("Turning you into {s}!!\n", .{into});
+            }
+            else {
+                try stdout.print("Transmogrifying into something indeterminate!\n", .{});
+            }
         }
 
         try stdout.flush();
