@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const zargsMod = b.addModule("zargunaught", .{
-        .root_source_file = .{ .path = "src/zargunaught.zig" },
+        .root_source_file = b.path("src/zargunaught.zig"),
     });
 
     _ = addExample(b, target, optimize, "basic", "examples/basic.zig", zargsMod);
