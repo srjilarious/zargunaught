@@ -1,5 +1,8 @@
 # Overview
 
+![Logo](images/zargunaught.png)
+
+![Version Badge](https://img.shields.io/badge/Version-0.4.0-brightgreen)
 ![Zig Version](https://img.shields.io/badge/Zig%20Version-0.13.0-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -7,9 +10,30 @@ Zargunaught is an argument parsing library for zig, based off of my earlier `arg
 
 It doesn't try to map your options into a structure or use meta programming tricks to determine the types of option values.  It instead parses them into a results structure and provides helpers for getting them, leaving the data type conversion mostly up to the client program.
 
+# Installing
+
+The easiest way to use `zargunaught` in your zig program is to grab the latest tag:
+
+```
+zig fetch https://github.com/srjilarious/zargunaught/archive/refs/tags/v0.4.0.tar.gz
+```
+
+and then add it as a dependency in your `build.zig`:
+
+```
+const zargsMod = b.dependency("zargunaught", .{});
+exe.root_module.addImport("zargunaught", zargsMod.module("zargunaught"));
+```
+
 # Example
 
-A simple configuration and parsing example can be seen in the `examples/basic.zig` program:
+A simple configuration and parsing example can be seen in the `examples/basic.zig` program
+
+Here's what the help output looks like for the basic example below:
+
+![Basic example help output](images/basic_example_help.png)
+
+and here's the setup code in the example:
 
 ```zig
 var parser = try zargs.ArgParser.init(
@@ -42,29 +66,7 @@ defer args.deinit();
 
 Here you can see global options being setup, along with commands where one has a command specific option available.
 
-There is a built in help formatting module that can format the information in the argument parser configuration nicely and is easy to style with different colors and such.  
+There is a built in help formatting module that can format the information in the argument parser configuration nicely and which is easy to style with different colors and such.  
 
 It also handles wrapping lines of descriptions for options and commands that get too long and properly indenting them to be more pleasing:
 
-```
-zig build basic -- help                                                          ─╯
-
-Test program - A cool test program
-
-Mostly used to transmogrify a thing into a thing.
-
-Global Options
-  --alpha, -a   : The first option
-  --beta, -b    : Another option
-  --gamma, -g   : The last option here.
-
-Commands
-  help          : Prints out this help.
-
-  transmogrify
-    --into, -i  : What you want to transform into. This is super useful if you
-                  want to change what you look like or pretend to be someone
-                  else for a prank.  Highly recommended!
-```
-
-Note: Not seen here is the default ANSI coloring styles applied.

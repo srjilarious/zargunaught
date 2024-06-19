@@ -15,15 +15,11 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        .testz = .{ .path = "../testz" },
+        .testz = .{
+            .url = "https://github.com/srjilarious/testz/archive/refs/tags/v0.5.2.tar.gz",
+            .hash = "12203a472c0fe7bb7ce0d014e871de7856ccd51205ee5197c201864ea460b39ed170",
+        },
     },
-
-    // Specifies the set of files and directories that are included in this package.
-    // Only files and directories listed here are included in the `hash` that
-    // is computed for this package.
-    // Paths are relative to the build root. Use the empty string (`""`) to refer to
-    // the build root itself.
-    // A directory listed here means that all files within, recursively, are included.
     .paths = .{
         // This makes *all* files, recursively, included in this package. It is generally
         // better to explicitly list the files and directories instead, to insure that

@@ -15,20 +15,20 @@ fn basicOptionParsing() !void {
             .name = "Test program",
             .description = "A cool test program",
             .usage = "Mostly used to transmogrify a thing into a thing.",
-            .opts = &[_]Option{
-                Option{ .longName = "alpha", .shortName = "a", .description = "The first option", .maxNumParams = 0 },
-                Option{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
-                Option{ .longName = "gamma", .shortName = "g", .description = "The last option here."},
+            .opts = &.{
+                .{ .longName = "alpha", .shortName = "a", .description = "The first option", .maxNumParams = 0 },
+                .{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
+                .{ .longName = "gamma", .shortName = "g", .description = "The last option here."},
+                .{ .longName = "help", .shortName="h", .description = "Prints out help for the program." },
             },
             .commands = &.{
-            .{ .name = "help", .description = "Prints out this help." },
             .{ .name = "transmogrify", 
                .opts = &.{
                     .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 }
                 }
             }
         }
-        });
+    });
     defer parser.deinit();
 
     var args = parser.parse() catch |err| {
@@ -37,16 +37,17 @@ fn basicOptionParsing() !void {
     };
     defer args.deinit();
 
-    if(args.command != null) {
-        var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
-        if(std.mem.eql(u8, args.command.?.name, "help")) {
-            var help = zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme);
-            help.printHelpText() catch |err| {
-                std.debug.print("Err: {any}\n", .{err});
-            };
-        }
+    var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
+    defer stdout.deinit();
 
-        else if(std.mem.eql(u8, args.command.?.name, "transmogrify")) {
+    if(args.hasOption("help")) {
+        var help = zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme);
+        help.printHelpText() catch |err| {
+            std.debug.print("Err: {any}\n", .{err});
+        };
+    }
+    else if(args.command != null) {
+        if(std.mem.eql(u8, args.command.?.name, "transmogrify")) {
             if(args.optionVal("into")) |into| {
                 try stdout.print("Turning you into {s}!!\n", .{into});
             }
@@ -54,22 +55,14 @@ fn basicOptionParsing() !void {
                 try stdout.print("Transmogrifying into something indeterminate!\n", .{});
             }
         }
-
-        try stdout.flush();
     }
-    else {
-        for (args.options.items) |opt| {
-            std.debug.print("Got option: {s}\n", .{opt.name});
-            for (opt.values.items) |val| {
-                std.debug.print("  - {s}\n", .{val});
-            }
+
+    for (args.options.items) |opt| {
+        try stdout.print("Got option: {s}\n", .{opt.name});
+        for (opt.values.items) |val| {
+            try stdout.print("  - {s}\n", .{val});
         }
     }
 
-    // var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
-    // try args.append("--alpha");
-    // try args.append("--beta");
-    // try args.append("test!");
-    //
-    // _ = try parser.parse(args);
+    try stdout.flush();
 }
