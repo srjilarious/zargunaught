@@ -21,7 +21,9 @@ pub const Option = struct {
     longName: []const u8,
     shortName: []const u8,
     description: []const u8,
+    minNumParams: i8 = 0,
     maxNumParams: i8 = 0,
+    default: ?[]const u8 = null,
 };
 
 
@@ -355,31 +357,49 @@ pub const ArgParser = struct {
 
         var parseResult = ArgParserResult.init(self.alloc);
         // var lastOpt: ?OptionResult = null;
-        if(parseText.len == 0) return parseResult;
 
-        try parseArgsForOptions(&parseResult, &self.options, &parseText);
+        // Create a temporary option list to use to find combined global and command level options.
+        // Allso used for handling checking for adding in default values at the end.
+        var availableOpts = OptionList.init(self.alloc);
+        defer availableOpts.deinit();
 
-        if(parseText.len == 0) return parseResult;
+        try availableOpts.addOptions(self.options.data.items);
 
-        // Setup command list.
-        const frontData = parseText.first.?.data;
+        // if(parseText.len == 0) return parseResult;
 
-        // Handle looking for commands after any initial global options.
-        for(0..self.commands.data.items.len) |cmdIdx| {
-            const cmd: *Command = &self.commands.data.items[cmdIdx];
-            if(std.mem.eql(u8, cmd.name, frontData)) {
-                parseResult.command = cmd;
+        if(parseText.len > 0) {
+            try parseArgsForOptions(&parseResult, &self.options, &parseText);
+        }
 
-                _ = parseText.popFirst();
+        if(parseText.len > 0) {
+            // Setup command list.
+            const frontData = parseText.first.?.data;
 
-                // Create a temporary option list to use to find combined global and command level options.
-                var availableOpts = OptionList.init(self.alloc);
-                defer availableOpts.deinit();
+            // Handle looking for commands after any initial global options.
+            for(0..self.commands.data.items.len) |cmdIdx| {
+                const cmd: *Command = &self.commands.data.items[cmdIdx];
+                if(std.mem.eql(u8, cmd.name, frontData)) {
+                    parseResult.command = cmd;
 
-                try availableOpts.addOptions(self.options.data.items);
-                try availableOpts.addOptions(cmd.options.data.items);
+                    _ = parseText.popFirst();
 
-                try parseArgsForOptions(&parseResult, &availableOpts, &parseText);
+                    // Add the command level options to our temp opts list.
+                    try availableOpts.addOptions(cmd.options.data.items);
+
+                    try parseArgsForOptions(&parseResult, &availableOpts, &parseText);
+                }
+            }
+        }
+
+        // Handle filling in any options with defaults that weren't specified but have defaults configured.
+        for(availableOpts.data.items) |opt| {
+            if(opt.default == null) continue;
+    
+            if(!parseResult.hasOption(opt.longName)) {
+                const defaultVal = opt.default.?;
+                var optResult = OptionResult.init(opt.longName);
+                try optResult.values.append(defaultVal);
+                try parseResult.options.append(optResult);
             }
         }
 
@@ -389,6 +409,7 @@ pub const ArgParser = struct {
             try parseResult.positional.append(posData);
             _ = parseText.popFirst();
         }
+
         return parseResult;
     }
 };

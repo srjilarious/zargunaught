@@ -129,3 +129,27 @@ pub fn simpleShortOptionParseTest() !void {
         try testz.expectEqualStr(opt.values.items[0], "234");
     }
 }
+
+pub fn checkDefaultValues() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "", .default = "blah" },
+        .{ .longName = "delta", .shortName = "d", .description = "", .default = "boop" },
+    } });
+    defer parser.deinit();
+
+    const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "");
+    defer std.heap.page_allocator.free(sysv);
+
+    const args = try parser.parseArray(sysv);
+    try testz.expectEqual(args.options.items.len, 2);
+
+    const opt = args.options.items[0];
+    try testz.expectEqualStr(opt.name, "beta");
+    try testz.expectEqual(opt.values.items.len, 1);
+    try testz.expectEqualStr(opt.values.items[0], "blah");
+
+    const opt2 = args.options.items[1];
+    try testz.expectEqualStr(opt2.name, "delta");
+    try testz.expectEqual(opt2.values.items.len, 1);
+    try testz.expectEqualStr(opt2.values.items[0], "boop");
+}
