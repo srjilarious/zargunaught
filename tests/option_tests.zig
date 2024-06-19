@@ -130,6 +130,53 @@ pub fn simpleShortOptionParseTest() !void {
     }
 }
 
+pub fn testMinParams() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "delta", .shortName = "d", .description = "", .minNumParams = 1, .default = "boop" },
+    } });
+    defer parser.deinit();
+
+    // Test with too few params for delta
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--delta");
+        defer std.heap.page_allocator.free(sysv);
+
+        if (parser.parseArray(sysv)) |_| {
+            try testz.failWith("Expected a parsing error!");
+        } else |err| {
+            try testz.expectEqual(zargs.ParseError.TooFewOptionParams, err);
+        }
+    }
+
+    // Test that with min params satisfied that things work.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--delta bop!");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+
+        const opt = args.options.items[0];
+        try testz.expectEqualStr(opt.name, "delta");
+        try testz.expectEqual(opt.values.items.len, 1);
+        try testz.expectEqualStr(opt.values.items[0], "bop!");
+    }
+
+    // Test that a default option is ok.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+
+        const opt = args.options.items[0];
+        try testz.expectEqualStr(opt.name, "delta");
+        try testz.expectEqual(opt.values.items.len, 1);
+        try testz.expectEqualStr(opt.values.items[0], "boop");
+    }
+}
+
 pub fn checkDefaultValues() !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
         .{ .longName = "beta", .shortName = "b", .description = "", .default = "blah" },

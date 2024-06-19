@@ -15,14 +15,14 @@ pub const ParserConfigError = error{
     CommandGroupNameMissing,
 };
 
-pub const ParseError = error{UnknownOption};
+pub const ParseError = error{UnknownOption, TooFewOptionParams};
 
 pub const Option = struct {
     longName: []const u8,
     shortName: []const u8,
     description: []const u8,
-    minNumParams: i8 = 0,
-    maxNumParams: i8 = 0,
+    minNumParams: ?u8 = null,
+    maxNumParams: ?u8 = null,
     default: ?[]const u8 = null,
 };
 
@@ -274,8 +274,9 @@ pub const ArgParser = struct {
 
             var paramCounter: usize = 0;
             while (parseText.len > 0 and
-                (opt.?.maxNumParams == -1 or
-                paramCounter < opt.?.maxNumParams)) : (paramCounter += 1)
+                (opt.?.maxNumParams == null or
+                // TODO: Fix maxNumParams == 0 case for min params.
+                paramCounter < opt.?.maxNumParams.?)) : (paramCounter += 1)
             {
                 const currVal = parseText.first.?.data;
                 if (currVal[0] == '-' and currVal.len > 1) {
@@ -289,6 +290,10 @@ pub const ArgParser = struct {
                 paramCounter += 1;
 
                 // std.debug.print("    Option param: {s}\n", .{currVal});
+            }
+
+            if(opt.?.minNumParams != null and optResult.values.items.len < opt.?.minNumParams.?) {
+                return ParseError.TooFewOptionParams;
             }
 
             return optResult;

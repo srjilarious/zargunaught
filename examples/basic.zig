@@ -18,7 +18,7 @@ fn basicOptionParsing() !void {
             .opts = &[_]Option{
                 Option{ .longName = "alpha", .shortName = "a", .description = "The first option", .maxNumParams = 0 },
                 Option{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
-                Option{ .longName = "gamma", .shortName = "g", .description = "The last option here.", .maxNumParams = -1 },
+                Option{ .longName = "gamma", .shortName = "g", .description = "The last option here."},
             },
             .commands = &.{
             .{ .name = "help", .description = "Prints out this help." },
