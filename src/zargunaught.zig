@@ -108,7 +108,8 @@ pub const OptionList = struct {
 
 pub const Command = struct { 
     name: []const u8, 
-    description: ?[]const u8,
+    description: ?[]const u8 = null,
+    group: ?[]const u8 = null,
     options: OptionList 
 };
 
@@ -159,13 +160,24 @@ pub const CommandList = struct {
     }
 };
 
+/// The configuration options for a command used when setting
+/// up the ArgParser.
 pub const CommandOpt = struct {
     name: []const u8,
     description: ?[]const u8 = null,
-    // group: ?[]const u8,
+    group: ?[]const u8 = null,
     opts: ?[]const Option = null,
 };
 
+/// The parameters for a named group of commands.  This is just
+/// a convenience wrapper for specifying the same group name on
+/// each command diretly.
+pub const GroupOpt = struct {
+    name: []const u8,
+    commands: [] const CommandOpt,
+};
+
+/// The top level configuration parameters for an ArgParser.
 pub const ArgParserOpts = struct {
     name: ?[]const u8 = null,
     banner: ?[]const u8 = null,
@@ -173,14 +185,18 @@ pub const ArgParserOpts = struct {
     usage: ?[]const u8 = null,
     opts: ?[]const Option = null,
     commands: ?[] const CommandOpt = null,
+    groups: ?[]const GroupOpt = null,
 };
 
+/// A zargunaught argument parser, with global options and commands.
 pub const ArgParser = struct {
     name: []const u8,
     banner: ?[]const u8,
     description: ?[]const u8,
     usage: ?[]const u8,
     options: OptionList,
+
+    // Contains all commands, even grouped ones.
     commands: CommandList,
     alloc: std.mem.Allocator,
 
@@ -208,6 +224,7 @@ pub const ArgParser = struct {
                 var cmdItem: Command = .{
                     .name=cmd.name,
                     .description=cmd.description,
+                    .group=cmd.group,
                     .options=OptionList.init(allocator)
                 };
 
@@ -218,6 +235,27 @@ pub const ArgParser = struct {
                 try argsParser.commands.data.append(cmdItem);
             }
         }
+
+        if(opts.groups != null) {
+            const groups = opts.groups.?;
+            for(groups) |group| {
+                for(group.commands) |cmd| {
+                    var cmdItem: Command = .{
+                        .name=cmd.name,
+                        .description=cmd.description,
+                        .group=group.name,
+                        .options=OptionList.init(allocator)
+                    };
+
+                    if(cmd.opts != null) {
+                        try cmdItem.options.addOptions(cmd.opts.?);
+                    }
+
+                    try argsParser.commands.data.append(cmdItem);
+                }
+            }
+        }
+
         return argsParser;
     }
 

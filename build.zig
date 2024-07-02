@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) void {
 
     _ = addExample(b, target, optimize, "basic", "examples/basic.zig", zargsMod);
 
-    var testsExe = addExample(b, target, optimize, "unit_tests", "tests/main.zig", zargsMod);
+    var testsExe = addExample(b, target, optimize, "tests", "tests/main.zig", zargsMod);
     const testzMod = b.dependency("testz", .{});
     testsExe.root_module.addImport("testz", testzMod.module("testz"));
 }
