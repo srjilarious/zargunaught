@@ -88,7 +88,7 @@ pub fn commandGroupsSimpleTest() !void {
                 }
             }
         }
-    }) ;
+    });
 
     defer parser.deinit();
 

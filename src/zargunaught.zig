@@ -17,13 +17,37 @@ pub const ParserConfigError = error{
 
 pub const ParseError = error{UnknownOption, TooFewOptionParams};
 
+// Used to provide a list of parameters to an option when it takes
+// parameters.
+const DefaultParameters = struct {
+    value: []const u8
+};
+
+// Used to set an option to default on when it has no parameters.
+const DefaultOption = struct {
+    on: bool = true
+};
+
+pub const DefaultValue = union(enum) {
+    params: DefaultParameters,
+    set: DefaultOption,
+
+    pub fn params(val: []const u8) DefaultValue {
+        return DefaultValue{ .params = .{ .value = val }};
+    }
+
+    pub fn set() DefaultValue {
+        return DefaultValue{ .set = .{ .on = true }};
+    }
+};
+
 pub const Option = struct {
     longName: []const u8,
     shortName: []const u8,
     description: []const u8,
     minNumParams: ?u8 = null,
     maxNumParams: ?u8 = null,
-    default: ?[]const u8 = null,
+    default: ?DefaultValue = null,
 };
 
 
@@ -441,8 +465,19 @@ pub const ArgParser = struct {
             if(!parseResult.hasOption(opt.longName)) {
                 const defaultVal = opt.default.?;
                 var optResult = OptionResult.init(opt.longName);
-                try optResult.values.append(defaultVal);
-                try parseResult.options.append(optResult);
+                switch(defaultVal) {
+                    .params => |p| {
+                        try optResult.values.append(p.value);
+                        try parseResult.options.append(optResult);
+                    },
+                    .set => |s| {
+                        // You could specify a default of not set, so handle
+                        // that case too.
+                        if(s.on) {
+                            try parseResult.options.append(optResult);
+                        }
+                    }
+                }
             }
         }
 

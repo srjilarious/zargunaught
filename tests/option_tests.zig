@@ -132,7 +132,7 @@ pub fn simpleShortOptionParseTest() !void {
 
 pub fn testMinParams() !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "delta", .shortName = "d", .description = "", .minNumParams = 1, .default = "boop" },
+        .{ .longName = "delta", .shortName = "d", .description = "", .minNumParams = 1, .default = zargs.DefaultValue.params("boop") },
     } });
     defer parser.deinit();
 
@@ -179,8 +179,8 @@ pub fn testMinParams() !void {
 
 pub fn checkDefaultValues() !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "beta", .shortName = "b", .description = "", .default = "blah" },
-        .{ .longName = "delta", .shortName = "d", .description = "", .default = "boop" },
+        .{ .longName = "beta", .shortName = "b", .description = "", .default = zargs.DefaultValue.params("blah") },
+        .{ .longName = "delta", .shortName = "d", .description = "", .default = zargs.DefaultValue.params("boop") },
     } });
     defer parser.deinit();
 
@@ -199,4 +199,22 @@ pub fn checkDefaultValues() !void {
     try testz.expectEqualStr(opt2.name, "delta");
     try testz.expectEqual(opt2.values.items.len, 1);
     try testz.expectEqualStr(opt2.values.items[0], "boop");
+}
+
+pub fn checkDefaultOptionsWithoutParams() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "" },
+        .{ .longName = "delta", .shortName = "d", .description = "", .default = zargs.DefaultValue.set() },
+    } });
+    defer parser.deinit();
+
+    const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "");
+    defer std.heap.page_allocator.free(sysv);
+
+    const args = try parser.parseArray(sysv);
+    try testz.expectEqual(args.options.items.len, 1);
+
+    const opt = args.options.items[0];
+    try testz.expectEqualStr(opt.name, "delta");
+    try testz.expectEqual(opt.values.items.len, 0);
 }
