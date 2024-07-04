@@ -2,7 +2,7 @@
 
 ![Logo](images/zargunaught.png)
 
-![Version Badge](https://img.shields.io/badge/Version-0.4.0-brightgreen)
+![Version Badge](https://img.shields.io/badge/Version-0.4.1-brightgreen)
 ![Zig Version](https://img.shields.io/badge/Zig%20Version-0.13.0-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
