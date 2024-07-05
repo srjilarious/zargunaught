@@ -116,13 +116,12 @@ pub const HelpFormatter = struct
 
             try self.theme.progDescription.set(self.printer);
             try self.printer.print("{?s}", .{self.args.description});
+            try self.newLine();
         }
 
         try self.newLine();
 
         if(self.args.usage != null) {
-            try self.newLine();
-            
             try self.theme.usage.set(self.printer);
             try self.printer.print("{?s}", .{self.args.usage});
             
@@ -130,80 +129,87 @@ pub const HelpFormatter = struct
             try self.newLine();
         }
 
-        try self.theme.groupName.set(self.printer);
-        try self.printer.print("Global Options", .{});
-        try Style.reset(self.printer);
-        try self.newLine();
-
-        // Look at global options
-        for(self.args.options.data.items) |opt| {
-            try Style.reset(self.printer);
-            try self.printer.print("  ", .{});
-
-            try self.theme.optionName.set(self.printer);
-            const optLen = try self.optionHelpName(&opt);
-
-            try self.theme.separator.set(self.printer);
-            try self.printer.printNum(" ", maxOptComLen - optLen);
-            try self.printer.print(": ", .{});
-
-            try self.theme.description.set(self.printer);
-            try self.printer.print("{s}", .{opt.description});
-            try self.newLine();
-        }
-
-        try self.newLine();
-        try self.theme.groupName.set(self.printer);
-        try self.printer.print("Commands", .{});
-        try Style.reset(self.printer);
-
-        // Check the commands too
-        for(self.args.commands.data.items) |com| {
-
+        if(self.args.options.data.items.len > 0) {
+            try self.theme.groupName.set(self.printer);
+            try self.printer.print("Global Options", .{});
             try Style.reset(self.printer);
             try self.newLine();
 
-            try self.theme.commandName.set(self.printer);
-            try self.printer.print("  {s}", .{com.name});
-
-            // Print out the command description if there is one.
-            if(com.description != null) {
-                try self.theme.separator.set(self.printer);
-                // Account for command not having dashes.
-                try self.printer.printNum(" ", maxOptComLen - com.name.len + 2);
-                try self.printer.print(": ", .{});
-
-                try self.theme.description.set(self.printer);
-                try self.printer.print("{?s}", .{com.description});
-            }
-
-            try self.newLine();
-
-            // Check the command options as well
-            for(com.options.data.items) |opt| {
+            // Look at global options
+            for(self.args.options.data.items) |opt| {
                 try Style.reset(self.printer);
-                try self.printer.print("    ", .{});
+                try self.printer.print("  ", .{});
 
                 try self.theme.optionName.set(self.printer);
                 const optLen = try self.optionHelpName(&opt);
 
                 try self.theme.separator.set(self.printer);
-
-                // Account for extra 2 indentation for command option.
-                try self.printer.printNum(" ", maxOptComLen - optLen - 2);
+                try self.printer.printNum(" ", maxOptComLen - optLen);
                 try self.printer.print(": ", .{});
 
-
                 try self.theme.description.set(self.printer);
-                // try self.printer.print("{s}", .{opt.description});
-                _ = try self.printer.printWrapped(
-                        opt.description,
-                        maxOptComLen + 2 + 4,
-                        maxOptComLen + 2 + 4,
-                        80
-                    );
+                try self.printer.print("{s}", .{opt.description});
                 try self.newLine();
             }
+
+            try self.newLine();
+        }
+
+        if(self.args.commands.data.items.len > 0) {
+            try self.theme.groupName.set(self.printer);
+            try self.printer.print("Commands", .{});
+            try Style.reset(self.printer);
+
+            // Check the commands too
+            for(self.args.commands.data.items) |com| {
+
+                try Style.reset(self.printer);
+                try self.newLine();
+
+                try self.theme.commandName.set(self.printer);
+                try self.printer.print("  {s}", .{com.name});
+
+                // Print out the command description if there is one.
+                if(com.description != null) {
+                    try self.theme.separator.set(self.printer);
+                    // Account for command not having dashes.
+                    try self.printer.printNum(" ", maxOptComLen - com.name.len + 2);
+                    try self.printer.print(": ", .{});
+
+                    try self.theme.description.set(self.printer);
+                    try self.printer.print("{?s}", .{com.description});
+                }
+
+                try self.newLine();
+
+                // Check the command options as well
+                for(com.options.data.items) |opt| {
+                    try Style.reset(self.printer);
+                    try self.printer.print("    ", .{});
+
+                    try self.theme.optionName.set(self.printer);
+                    const optLen = try self.optionHelpName(&opt);
+
+                    try self.theme.separator.set(self.printer);
+
+                    // Account for extra 2 indentation for command option.
+                    try self.printer.printNum(" ", maxOptComLen - optLen - 2);
+                    try self.printer.print(": ", .{});
+
+
+                    try self.theme.description.set(self.printer);
+                    // try self.printer.print("{s}", .{opt.description});
+                    _ = try self.printer.printWrapped(
+                            opt.description,
+                            maxOptComLen + 2 + 4,
+                            maxOptComLen + 2 + 4,
+                            80
+                        );
+                    try self.newLine();
+                }
+            }
+
+            try self.newLine();
         }
     }
 
@@ -219,7 +225,7 @@ pub const HelpFormatter = struct
         try self.optionDash(.Long);
         try self.theme.optionName.set(self.printer);
         try self.printer.print("{s}", .{opt.longName});
-        amount += opt.longName.len + 2;
+        amount += opt.longName.len + 1;
 
         if(opt.shortName.len > 0) {
             try self.theme.optionSeparator.set(self.printer);
@@ -229,7 +235,7 @@ pub const HelpFormatter = struct
             try self.optionDash(.Short);
             try self.theme.optionName.set(self.printer);
             try self.printer.print("{s}", .{opt.shortName});
-            amount += opt.shortName.len + 1;
+            amount += opt.shortName.len + 3;
         }
 
         return amount;

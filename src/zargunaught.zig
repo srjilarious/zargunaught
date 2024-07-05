@@ -43,8 +43,8 @@ pub const DefaultValue = union(enum) {
 
 pub const Option = struct {
     longName: []const u8,
-    shortName: []const u8,
-    description: []const u8,
+    shortName: []const u8 = "",
+    description: []const u8 = "",
     minNumParams: ?u8 = null,
     maxNumParams: ?u8 = null,
     default: ?DefaultValue = null,

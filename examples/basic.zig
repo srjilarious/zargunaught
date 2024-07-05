@@ -16,15 +16,16 @@ fn basicOptionParsing() !void {
             .description = "A cool test program",
             .usage = "Mostly used to transmogrify a thing into a thing.",
             .opts = &.{
-                .{ .longName = "alpha", .shortName = "a", .description = "The first option", .maxNumParams = 0 },
+                .{ .longName = "alpha", .description = "The first option", .maxNumParams = 0 },
                 .{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
                 .{ .longName = "gamma", .shortName = "g", .description = "The last option here."},
-                .{ .longName = "help", .shortName="h", .description = "Prints out help for the program." },
+                .{ .longName = "help", .description = "Prints out help for the program." },
             },
             .commands = &.{
             .{ .name = "transmogrify", 
                .opts = &.{
-                    .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 }
+                    .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 },
+                    .{ .longName = "another", .description = "Another option for the command." },
                 }
             }
         }
