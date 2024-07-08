@@ -303,7 +303,10 @@ pub const ArgParser = struct {
     //     return self;
     // }
 
-    fn parseOption(parseText: *ArgQueue, parseResult: *ArgParserResult, availableOpts: *const OptionList) ParseError!?OptionResult {
+    fn parseOption(parseText: *ArgQueue, 
+                   parseResult: *ArgParserResult, 
+                   availableOpts: *const OptionList,
+                   unsetOptions: *std.ArrayList([] const u8)) !?OptionResult {
         if (parseText.len == 0) return null;
 
         const optFullName = parseText.first.?.data;
@@ -321,7 +324,23 @@ pub const ArgParser = struct {
 
         if (optFullName[0] == '-' and optFullName[1] == '-') {
             optName = optFullName[2..];
-            opt = availableOpts.findLongOption(optName);
+
+            // Check if we are unsetting an option.
+            if(std.mem.startsWith(u8, optName, "no-")) {
+                // Skip of the 'no-'
+                optName = optName[3..];
+                if(availableOpts.findLongOption(optName) == null) {
+                    return ParseError.UnknownOption;
+                }
+
+                _ = parseText.popFirst();
+                parseResult.currItemPos += 1;
+                try unsetOptions.append(optName);
+                return null;
+            }
+            else {
+                opt = availableOpts.findLongOption(optName);
+            }
         }
         else if (optFullName[0] == '-') {
             optName = optFullName[1..];
@@ -393,7 +412,11 @@ pub const ArgParser = struct {
     }
 
     // TODO: Add in returning state for case where we hit `-`
-    pub fn parseArgsForOptions(parseResult: *ArgParserResult, availableOpts: *const OptionList, parseText: *ArgQueue) !void
+    pub fn parseArgsForOptions(
+            parseResult: *ArgParserResult, 
+            availableOpts: *const OptionList, 
+            parseText: *ArgQueue, 
+            unsetOptions: *std.ArrayList([] const u8)) !void
     {
         while (isNextItemLikelyAnOption(parseText)) {
             // Check if we ran into a number
@@ -401,10 +424,10 @@ pub const ArgParser = struct {
             if (frontData.len > 1 and std.ascii.isDigit(frontData[1])) break;
 
             // TODO: change to catching and adding a better error.
-            const optRes = try parseOption(parseText, parseResult, availableOpts);
-            if(optRes == null) break;
-
-            try parseResult.options.append(optRes.?);
+            const optRes = try parseOption(parseText, parseResult, availableOpts, unsetOptions);
+            if(optRes != null) {
+                try parseResult.options.append(optRes.?);
+            }
         }
     }
 
@@ -434,8 +457,11 @@ pub const ArgParser = struct {
 
         // if(parseText.len == 0) return parseResult;
 
+        var unsetOptions = std.ArrayList([]const u8).init(self.alloc);
+        defer unsetOptions.deinit();
+
         if(parseText.len > 0) {
-            try parseArgsForOptions(&parseResult, &self.options, &parseText);
+            try parseArgsForOptions(&parseResult, &self.options, &parseText, &unsetOptions);
         }
 
         if(parseText.len > 0) {
@@ -453,16 +479,24 @@ pub const ArgParser = struct {
                     // Add the command level options to our temp opts list.
                     try availableOpts.addOptions(cmd.options.data.items);
 
-                    try parseArgsForOptions(&parseResult, &availableOpts, &parseText);
+                    try parseArgsForOptions(&parseResult, &availableOpts, &parseText, &unsetOptions);
                 }
             }
         }
 
         // Handle filling in any options with defaults that weren't specified but have defaults configured.
-        for(availableOpts.data.items) |opt| {
+        defaultOptLoop: for(availableOpts.data.items) |opt| {
             if(opt.default == null) continue;
     
             if(!parseResult.hasOption(opt.longName)) {
+
+                // Check if we specifically unset an option.
+                for(unsetOptions.items) |unset| {
+                    if(std.mem.eql(u8, opt.longName, unset)) {
+                        continue :defaultOptLoop;
+                    }
+                }
+
                 const defaultVal = opt.default.?;
                 var optResult = OptionResult.init(opt.longName);
                 switch(defaultVal) {
@@ -498,13 +532,13 @@ pub const ArgParserResult = struct {
     options: std.ArrayList(OptionResult),
     command: ?*Command,
     positional: std.ArrayList([]const u8),
-
+    
     pub fn init(allocator: std.mem.Allocator) ArgParserResult {
         return .{ 
             .currItemPos = 0, 
             .options = std.ArrayList(OptionResult).init(allocator),
             .command = null,
-            .positional = std.ArrayList([]const u8).init(allocator) };
+            .positional = std.ArrayList([]const u8).init(allocator)};
     }
 
     pub fn deinit(self: *ArgParserResult) void {

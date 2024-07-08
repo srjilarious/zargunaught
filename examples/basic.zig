@@ -17,7 +17,7 @@ fn basicOptionParsing() !void {
             .usage = "Mostly used to transmogrify a thing into a thing.",
             .opts = &.{
                 .{ .longName = "alpha", .description = "The first option", .maxNumParams = 0 },
-                .{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1 },
+                .{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1, .default = zargs.DefaultValue.params("thing")},
                 .{ .longName = "gamma", .shortName = "g", .description = "The last option here."},
                 .{ .longName = "help", .description = "Prints out help for the program." },
             },

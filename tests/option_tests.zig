@@ -218,3 +218,42 @@ pub fn checkDefaultOptionsWithoutParams() !void {
     try testz.expectEqualStr(opt.name, "delta");
     try testz.expectEqual(opt.values.items.len, 0);
 }
+
+pub fn alllowANoPrefixOnOptions() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "beta", .shortName = "b", .description = "", .default = zargs.DefaultValue.set() },
+        .{ .longName = "delta", .shortName = "d", .description = "", .default = zargs.DefaultValue.set() },
+    } });
+    defer parser.deinit();
+
+    // By default we should set both of our options above.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 2);
+    }
+
+    // Turn off both options with a `no-` prefix.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--no-beta --no-delta");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 0);
+    }
+
+    // Check again but with just one option turned off.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--no-beta");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+
+        const opt = args.options.items[0];
+        try testz.expectEqualStr(opt.name, "delta");
+        try testz.expectEqual(opt.values.items.len, 0);
+    }
+}
