@@ -22,12 +22,25 @@ fn basicOptionParsing() !void {
                 .{ .longName = "help", .description = "Prints out help for the program." },
             },
             .commands = &.{
-            .{ .name = "transmogrify", 
+            .{ .name = "transmogrify",
+               .group = "Spells",
                .opts = &.{
                     .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 },
                     .{ .longName = "another", .description = "Another option for the command." },
                 }
-            }
+            },
+            .{ .name = "lightning_bolt", 
+               .group = "Spells",
+            },
+            .{ .name = "brew_potion",
+               .group = "Production",
+            },
+            .{ .name = "write_scroll",
+                .group = "Production",
+            },
+            .{ .name = "sweep",
+                .group = "Chores",
+            },
         }
     });
     defer parser.deinit();
@@ -42,7 +55,9 @@ fn basicOptionParsing() !void {
     defer stdout.deinit();
 
     if(args.hasOption("help")) {
-        var help = zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme);
+        var help = try zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme, std.heap.page_allocator);
+        defer help.deinit();
+
         help.printHelpText() catch |err| {
             std.debug.print("Err: {any}\n", .{err});
         };

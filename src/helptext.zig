@@ -61,6 +61,8 @@ pub const HelpTheme = struct {
     description: Style,
 };
 
+const CommandGroup = std.ArrayList(*Command);
+
 pub const DefaultTheme: HelpTheme = .{
     .banner = .{ .fg = .BrightYellow, .bg = .Reset, .mod = .{ .bold = true } },
     .progDescription = .{ .fg = .BrightWhite, .bg = .Reset, .mod = .{ } },
@@ -81,22 +83,121 @@ pub const HelpFormatter = struct
     args: *const ArgParser,
     printer: Printer,
     theme: HelpTheme,
+    alloc: std.mem.Allocator,
+    commandGroups: std.StringHashMap(*CommandGroup),
 
     // A buffer used while printing so we can do word wrapping
     // properly.
     //buffer: [2048]u8,
 
-    pub fn init(args: *const ArgParser, printer: Printer, theme: HelpTheme) HelpFormatter 
+    pub fn init(args: *const ArgParser, printer: Printer, theme: HelpTheme, alloc: std.mem.Allocator) !HelpFormatter 
     {
+        var groups = std.StringHashMap(*CommandGroup).init(alloc);
+        for(0..args.commands.data.items.len) |idx| {
+            const cmd: *Command = &args.commands.data.items[idx];
+            var groupName: []const u8 = "";
+            if(cmd.group != null) {
+                groupName = cmd.group.?;
+            }
+
+            if(!groups.contains(groupName)) {
+                var group = try alloc.create(CommandGroup);
+                group.* = CommandGroup.init(alloc);
+
+                try group.append(cmd);
+                try groups.put(groupName, group);
+            } else {
+                std.debug.print("Adding {s}\n", .{ cmd.name });
+                var group = groups.get(groupName).?;
+
+                try group.append(cmd);
+                for(group.items) |i| {
+                    std.debug.print("- {s}\n", .{i.name});
+                }
+            }
+        }
+
         return .{
             .currLineLen = 0,
             .currIndentLevel = 0,
             .args = args,
             .printer = printer,
             .theme = theme,
+            .alloc = alloc,
+            .commandGroups = groups,
         };
     }
 
+    pub fn deinit(self: *HelpFormatter) void {
+        // TODO: free up each command group.
+        
+        self.commandGroups.deinit();
+    }
+
+    fn printCommandGroup(self: *HelpFormatter, groupName: []const u8, group: *const CommandGroup, maxOptComLen: usize) !void {
+        try self.theme.groupName.set(self.printer);
+
+        if(std.mem.eql(u8, groupName, "")) {
+            try self.printer.print("Commands", .{});
+        }
+        else {
+            try self.printer.print("{s}", .{groupName});
+        }
+
+        try Style.reset(self.printer);
+
+        // Iterate over the commands.
+        for(group.items) |com| {
+
+            try Style.reset(self.printer);
+            try self.newLine();
+
+            try self.theme.commandName.set(self.printer);
+            try self.printer.print("  {s}", .{com.name});
+
+            // Print out the command description if there is one.
+            if(com.description != null) {
+                try self.theme.separator.set(self.printer);
+                // Account for command not having dashes.
+                try self.printer.printNum(" ", maxOptComLen - com.name.len + 2);
+                try self.printer.print(": ", .{});
+
+               try self.theme.description.set(self.printer);
+                try self.printer.print("{?s}", .{com.description});
+            }
+
+            try self.newLine();
+
+            // Check the command options as well
+            for(com.options.data.items) |opt| {
+                try Style.reset(self.printer);
+                try self.printer.print("    ", .{});
+
+                try self.theme.optionName.set(self.printer);
+                const optLen = try self.optionHelpName(&opt);
+
+                try self.theme.separator.set(self.printer);
+
+                // Account for extra 2 indentation for command option.
+                try self.printer.printNum(" ", maxOptComLen - optLen - 2);
+                try self.printer.print(": ", .{});
+
+
+                try self.theme.description.set(self.printer);
+                // try self.printer.print("{s}", .{opt.description});
+                _ = try self.printer.printWrapped(
+                        opt.description,
+                        maxOptComLen + 2 + 4,
+                        maxOptComLen + 2 + 4,
+                        80
+                    );
+                try self.newLine();
+            }
+        }
+
+        try self.newLine();
+
+    }
     pub fn printHelpText(self: *HelpFormatter) !void
     {
         const maxOptComLen = findMaxOptComLength(self.args);
@@ -155,61 +256,14 @@ pub const HelpFormatter = struct
             try self.newLine();
         }
 
-        if(self.args.commands.data.items.len > 0) {
-            try self.theme.groupName.set(self.printer);
-            try self.printer.print("Commands", .{});
-            try Style.reset(self.printer);
+        var groupIterator = self.commandGroups.keyIterator();
+        while(true) {
+            const groupNamePtr = groupIterator.next();
+            if(groupNamePtr == null) break;
 
-            // Check the commands too
-            for(self.args.commands.data.items) |com| {
-
-                try Style.reset(self.printer);
-                try self.newLine();
-
-                try self.theme.commandName.set(self.printer);
-                try self.printer.print("  {s}", .{com.name});
-
-                // Print out the command description if there is one.
-                if(com.description != null) {
-                    try self.theme.separator.set(self.printer);
-                    // Account for command not having dashes.
-                    try self.printer.printNum(" ", maxOptComLen - com.name.len + 2);
-                    try self.printer.print(": ", .{});
-
-                    try self.theme.description.set(self.printer);
-                    try self.printer.print("{?s}", .{com.description});
-                }
-
-                try self.newLine();
-
-                // Check the command options as well
-                for(com.options.data.items) |opt| {
-                    try Style.reset(self.printer);
-                    try self.printer.print("    ", .{});
-
-                    try self.theme.optionName.set(self.printer);
-                    const optLen = try self.optionHelpName(&opt);
-
-                    try self.theme.separator.set(self.printer);
-
-                    // Account for extra 2 indentation for command option.
-                    try self.printer.printNum(" ", maxOptComLen - optLen - 2);
-                    try self.printer.print(": ", .{});
-
-
-                    try self.theme.description.set(self.printer);
-                    // try self.printer.print("{s}", .{opt.description});
-                    _ = try self.printer.printWrapped(
-                            opt.description,
-                            maxOptComLen + 2 + 4,
-                            maxOptComLen + 2 + 4,
-                            80
-                        );
-                    try self.newLine();
-                }
-            }
-
-            try self.newLine();
+            const groupName = groupNamePtr.?.*;
+            const group = self.commandGroups.get(groupName).?;
+            try self.printCommandGroup(groupName, group, maxOptComLen);
         }
     }
 
