@@ -21,27 +21,41 @@ fn basicOptionParsing() !void {
                 .{ .longName = "gamma", .shortName = "g", .description = "The last option here."},
                 .{ .longName = "help", .description = "Prints out help for the program." },
             },
-            .commands = &.{
-            .{ .name = "transmogrify",
-               .group = "Spells",
-               .opts = &.{
-                    .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 },
-                    .{ .longName = "another", .description = "Another option for the command." },
-                }
+            .groups = &.{
+                .{  .name = "Spells",
+                    .description = "Magical incantations and evocations.",
+                    .commands = &.{ 
+                        .{  .name = "transmogrify",
+                            .opts = &.{
+                                .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 },
+                                .{ .longName = "another", .description = "Another option for the command." },
+                            }
+                        },
+                        .{  .name = "lightning_bolt", 
+                            .description = "Creates a blistering bolt of lightning!.",
+                        },
+                    },
+                },
+                .{  .name = "Production",
+                    .description = "Create new magical implements.",
+                    .commands = &.{ 
+                        .{  .name = "brew_potion",
+                            .description = "Creates a new potion",
+                        },
+                        .{  .name = "write_scroll",
+                            .description = "Creates a new scroll.",
+                        },
+                    },
+                },
+                .{  .name = "Chores",
+                    .description = "Common drudgery tasks.",
+                    .commands = &.{ 
+                        .{  .name = "sweep",
+                            .description = "Clean up the laboratory."
+                        },
+                    },
+                },
             },
-            .{ .name = "lightning_bolt", 
-               .group = "Spells",
-            },
-            .{ .name = "brew_potion",
-               .group = "Production",
-            },
-            .{ .name = "write_scroll",
-                .group = "Production",
-            },
-            .{ .name = "sweep",
-                .group = "Chores",
-            },
-        }
     });
     defer parser.deinit();
 

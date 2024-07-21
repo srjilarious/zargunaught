@@ -199,6 +199,7 @@ pub const CommandOpt = struct {
 pub const GroupOpt = struct {
     name: []const u8,
     commands: [] const CommandOpt,
+    description: ?[]const u8 = null,
 };
 
 /// The top level configuration parameters for an ArgParser.
@@ -212,6 +213,10 @@ pub const ArgParserOpts = struct {
     groups: ?[]const GroupOpt = null,
 };
 
+pub const GroupData = struct {
+    description: ?[]const u8 = null,
+};
+
 /// A zargunaught argument parser, with global options and commands.
 pub const ArgParser = struct {
     name: []const u8,
@@ -220,6 +225,7 @@ pub const ArgParser = struct {
     usage: ?[]const u8,
     options: OptionList,
 
+    groupData: std.StringHashMap(*GroupData),
     // Contains all commands, even grouped ones.
     commands: CommandList,
     alloc: std.mem.Allocator,
@@ -232,6 +238,7 @@ pub const ArgParser = struct {
             .usage = opts.usage, 
             .options = OptionList.init(allocator),
             .commands = CommandList.init(allocator),
+            .groupData = std.StringHashMap(*GroupData).init(allocator),
             .alloc = allocator
         };
 
@@ -263,6 +270,13 @@ pub const ArgParser = struct {
         if(opts.groups != null) {
             const groups = opts.groups.?;
             for(groups) |group| {
+                // Add the description to our group meta data map.
+                if(group.description != null) {
+                    const newGroupData = try allocator.create(GroupData);
+                    newGroupData.* = .{ .description = group.description };
+                    try argsParser.groupData.put(group.name, newGroupData);
+                }
+
                 for(group.commands) |cmd| {
                     var cmdItem: Command = .{
                         .name=cmd.name,
@@ -283,9 +297,13 @@ pub const ArgParser = struct {
         return argsParser;
     }
 
-    pub fn deinit(self: ArgParser) void {
+    pub fn deinit(self: *ArgParser) void {
         self.options.deinit();
         self.commands.deinit();
+
+        // TODO: Free up group meta data.
+        self.groupData.deinit();
+
     }
 
     // pub fn description(self: *ArgParser, desc: []const u8) *ArgParser {

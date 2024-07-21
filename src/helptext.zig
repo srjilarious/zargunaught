@@ -54,6 +54,7 @@ pub const HelpTheme = struct {
     usage: Style,
     optionName: Style,
     commandName: Style,
+    groupDescription: Style,
     groupName: Style,
     optionDash: Style,
     optionSeparator: Style,
@@ -70,6 +71,7 @@ pub const DefaultTheme: HelpTheme = .{
     .optionName = .{ .fg = .Cyan, .bg = . Reset, .mod = .{ .bold = true } },
     .commandName = .{ .fg = .BrightBlue, .bg = . Reset, .mod = .{ .bold = true } },
     .groupName = .{ .fg = .BrightGreen, .bg = . Reset, .mod = .{ .underline = true } },
+    .groupDescription = .{ .fg = .White, .bg = . Reset, .mod = .{ .italic = true } },
     .optionDash = .{ .fg = .Cyan, .bg = . Reset, .mod = .{ .dim = true } },
     .optionSeparator = .{ .fg = .White, .bg = . Reset, .mod = .{ .dim = true } },
     .separator = .{ .fg = .White, .bg = . Reset, .mod = .{ .dim = true } },
@@ -107,13 +109,8 @@ pub const HelpFormatter = struct
                 try group.append(cmd);
                 try groups.put(groupName, group);
             } else {
-                std.debug.print("Adding {s}\n", .{ cmd.name });
                 var group = groups.get(groupName).?;
-
                 try group.append(cmd);
-                for(group.items) |i| {
-                    std.debug.print("- {s}\n", .{i.name});
-                }
             }
         }
 
@@ -146,6 +143,19 @@ pub const HelpFormatter = struct
 
         try Style.reset(self.printer);
 
+        // Print the group description if one exists.
+
+        if(self.args.groupData.contains(groupName)) {
+            const groupData = self.args.groupData.getPtr(groupName).?;
+            if(groupData.*.description != null) {
+                try self.newLine();
+                try self.theme.groupDescription.set(self.printer);
+                try self.printer.print("  {s}", .{groupData.*.description.?});
+                try self.newLine();
+                try Style.reset(self.printer);
+            }
+        }
+
         // Iterate over the commands.
         for(group.items) |com| {
 
@@ -154,6 +164,7 @@ pub const HelpFormatter = struct
 
             try self.theme.commandName.set(self.printer);
             try self.printer.print("  {s}", .{com.name});
+
 
             // Print out the command description if there is one.
             if(com.description != null) {
@@ -166,7 +177,9 @@ pub const HelpFormatter = struct
                 try self.printer.print("{?s}", .{com.description});
             }
 
-            try self.newLine();
+            if(com.options.data.items.len > 0) {
+                try self.newLine();
+            }
 
             // Check the command options as well
             for(com.options.data.items) |opt| {
@@ -196,8 +209,8 @@ pub const HelpFormatter = struct
         }
 
         try self.newLine();
-
     }
+
     pub fn printHelpText(self: *HelpFormatter) !void
     {
         const maxOptComLen = findMaxOptComLength(self.args);
@@ -264,7 +277,17 @@ pub const HelpFormatter = struct
             const groupName = groupNamePtr.?.*;
             const group = self.commandGroups.get(groupName).?;
             try self.printCommandGroup(groupName, group, maxOptComLen);
+            try self.newLine();
         }
+
+        // var groupDataIterator = self.args.groupData.keyIterator();
+        // while(true) {
+        //     const groupNamePtr = groupDataIterator.next();
+        //     if(groupNamePtr == null) break;
+        //
+        //     const groupData = self.args.groupData.getPtr(groupNamePtr.?.*).?;
+        //     std.debug.print("Group {s} - {?s}\n", .{groupNamePtr.?.*, groupData.*.description});
+        // }
     }
 
     // fn indent(level: usize) void
