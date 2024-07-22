@@ -18,8 +18,14 @@ pub const ParserConfigError = error{
 pub const ParseError = error{UnknownOption, TooFewOptionParams};
 
 // Used to provide a list of parameters to an option when it takes
-// parameters.
+// multiple parameters.
 const DefaultParameters = struct {
+    values: []const []const u8
+};
+
+// Used to provide a single of parameter to an option when it takes
+// one parameter.
+const DefaultParameter = struct {
     value: []const u8
 };
 
@@ -30,10 +36,15 @@ const DefaultOption = struct {
 
 pub const DefaultValue = union(enum) {
     params: DefaultParameters,
+    param: DefaultParameter,
     set: DefaultOption,
 
-    pub fn params(val: []const u8) DefaultValue {
-        return DefaultValue{ .params = .{ .value = val }};
+    pub fn params(vals: []const []const u8) DefaultValue {
+        return DefaultValue{ .params = .{ .values = vals }};
+    }
+
+    pub fn param(val: []const u8) DefaultValue {
+        return DefaultValue{ .param = .{ .value = val }};
     }
 
     pub fn set() DefaultValue {
@@ -519,6 +530,12 @@ pub const ArgParser = struct {
                 var optResult = OptionResult.init(opt.longName);
                 switch(defaultVal) {
                     .params => |p| {
+                        for(p.values) |pi| {
+                            try optResult.values.append(pi);
+                        }
+                        try parseResult.options.append(optResult);
+                    },
+                    .param => |p| {
                         try optResult.values.append(p.value);
                         try parseResult.options.append(optResult);
                     },
