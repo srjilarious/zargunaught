@@ -284,3 +284,43 @@ pub fn alllowANoPrefixOnOptions() !void {
         try testz.expectEqual(opt.values.items.len, 0);
     }
 }
+
+pub fn testTooFewOrTooManyPositionalArgs() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
+        .name = "Simple options",
+        .minNumPositionalArgs = 1,
+        .maxNumPositionalArgs = 2,
+    });
+    defer parser.deinit();
+
+    // Check that too few args is an error.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = parser.parseArray(sysv);
+        if (args != zargs.ParseError.TooFewPositionalArguments) {
+            try testz.failWith("Expected a too few positional args error!");
+        }
+    }
+
+    // Check that enough args is not an error.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "one two");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.positional.items.len, 2);
+    }
+
+    // Check that too many args is an error.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "one two three");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = parser.parseArray(sysv);
+        if (args != zargs.ParseError.TooManyPositionalArguments) {
+            try testz.failWith("Expected a too many positional args error!");
+        }
+    }
+}

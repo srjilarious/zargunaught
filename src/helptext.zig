@@ -217,27 +217,27 @@ pub const HelpFormatter = struct
 
         try self.newLine();
         try self.theme.banner.set(self.printer);
-        if(self.args.banner != null) {
-            try self.printer.print("{?s}", .{self.args.banner});
+        if(self.args.parserOpts.banner != null) {
+            try self.printer.print("{?s}", .{self.args.parserOpts.banner});
         }
         else {
             try self.printer.print("{s}", .{self.args.name});
         }
 
-        if(self.args.description != null) {
+        if(self.args.parserOpts.description != null) {
             try self.theme.separator.set(self.printer);
             try self.printer.print(" - ", .{});
 
             try self.theme.progDescription.set(self.printer);
-            try self.printer.print("{?s}", .{self.args.description});
+            try self.printer.print("{?s}", .{self.args.parserOpts.description});
             try self.newLine();
         }
 
         try self.newLine();
 
-        if(self.args.usage != null) {
+        if(self.args.parserOpts.usage != null) {
             try self.theme.usage.set(self.printer);
-            try self.printer.print("{?s}", .{self.args.usage});
+            try self.printer.print("{?s}", .{self.args.parserOpts.usage});
             
             try self.newLine();
             try self.newLine();
