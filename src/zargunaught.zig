@@ -583,4 +583,54 @@ pub const ArgParserResult = struct {
 
         return null;
     }
+
+    pub fn optionValOrDefault(self: *ArgParserResult, optName: []const u8, default: []const u8) []const u8 {
+        if (self.option(optName)) |o| {
+            if (o.values.items.len > 0) {
+                return o.values.items[0];
+            }
+        }
+
+        return default;
+    }
+
+    pub fn optionNumVal(self: *ArgParserResult, comptime T: type, optName: []const u8) !T {
+        const optVal = self.optionVal(optName);
+        if (optVal == null) return error.UnknownOption;
+
+        switch (T) {
+            u8, u16, u32, u64 => {
+                return try std.fmt.parseUnsigned(T, optVal.?, 0);
+            },
+            i8, i16, i32, i64 => {
+                return try std.fmt.parseInt(T, optVal.?, 0);
+            },
+            f32, f64 => {
+                return try std.fmt.parseFloat(T, optVal.?);
+            },
+            else => {
+                return error.UnhandledOptionType;
+            },
+        }
+    }
+
+    pub fn optionNumValOrDefault(self: *ArgParserResult, comptime T: type, optName: []const u8, default: T) !T {
+        const optVal = self.optionVal(optName);
+        if (optVal == null) return default;
+
+        switch (T) {
+            u8, u16, u32, u64 => {
+                return try std.fmt.parseUnsigned(T, optVal.?, 0);
+            },
+            i8, i16, i32, i64 => {
+                return try std.fmt.parseInt(T, optVal.?, 0);
+            },
+            f32, f64 => {
+                return try std.fmt.parseFloat(T, optVal.?);
+            },
+            else => {
+                return error.UnhandledOptionType;
+            },
+        }
+    }
 };
