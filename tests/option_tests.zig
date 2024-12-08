@@ -324,3 +324,53 @@ pub fn testTooFewOrTooManyPositionalArgs() !void {
         }
     }
 }
+
+pub fn testOptionStacking() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "verbose", .shortName = "v", .description = "log verbosity", .maxOccurences = 5 },
+        .{ .longName = "delta", .shortName = "d", .description = "" },
+    } });
+    defer parser.deinit();
+
+    // Check that we can still use a single occurence of a stacked option.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-v");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 1);
+    }
+
+    // Check that we can see multiple occurences of stacked option.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvvv");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 4);
+    }
+
+    // Check that we can see max occurences of stacked option.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvvvv");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 5);
+    }
+
+    // Check that we can see an error over max occurences of stacked option.
+    // {
+    //     const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvvvvv");
+    //     defer std.heap.page_allocator.free(sysv);
+    //
+    //     const args = parser.parseArray(sysv);
+    //     try testz.expectEqual(error.TooManyOptionOccurences, args);
+    // }
+}
