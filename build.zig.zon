@@ -16,8 +16,9 @@
     // internet connectivity.
     .dependencies = .{
         .testz = .{
-            .url = "https://github.com/srjilarious/testz/archive/refs/tags/v0.5.2.tar.gz",
-            .hash = "12203a472c0fe7bb7ce0d014e871de7856ccd51205ee5197c201864ea460b39ed170",
+            // .url = "https://github.com/srjilarious/testz/archive/refs/tags/v0.5.2.tar.gz",
+            // .hash = "12203a472c0fe7bb7ce0d014e871de7856ccd51205ee5197c201864ea460b39ed170",
+            .path = "../testz",
         },
     },
     .paths = .{

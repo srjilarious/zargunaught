@@ -366,11 +366,86 @@ pub fn testOptionStacking() !void {
     }
 
     // Check that we can see an error over max occurences of stacked option.
-    // {
-    //     const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvvvvv");
-    //     defer std.heap.page_allocator.free(sysv);
-    //
-    //     const args = parser.parseArray(sysv);
-    //     try testz.expectEqual(error.TooManyOptionOccurences, args);
-    // }
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvvvvv");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = parser.parseArray(sysv);
+        try testz.expectError(args, error.TooManyOptionOccurences);
+    }
+}
+
+pub fn testOptionStackingWithLastParams() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{
+            .longName = "verbose",
+            .shortName = "v",
+            .description = "log verbosity",
+            .maxOccurences = 5,
+            .maxNumParams = 0,
+        },
+        .{
+            .longName = "gamma",
+            .shortName = "g",
+            .description = "",
+        },
+        .{
+            .longName = "delta",
+            .shortName = "d",
+            .description = "",
+            .maxNumParams = 3,
+        },
+    } });
+    defer parser.deinit();
+
+    // Check that we can see multiple occurences of stacked option and another option as well.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-dvvv");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 2);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 3);
+
+        const deltaResult = args.option("delta");
+        try testz.expectEqual(deltaResult.?.values.items.len, 0);
+    }
+
+    // Check that we can see multiple occurences of stacked option and another option as well.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-dgvv");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 3);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 2);
+
+        const gammaResult = args.option("gamma");
+        try testz.expectEqual(gammaResult.?.values.items.len, 0);
+
+        const deltaResult = args.option("delta");
+        try testz.expectEqual(deltaResult.?.values.items.len, 0);
+    }
+
+    // Check that we can see multiple occurences of stacked options, plus the last can get params.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvgvvd one two three");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 3);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 4);
+
+        const gammaResult = args.option("gamma");
+        try testz.expectEqual(gammaResult.?.values.items.len, 0);
+
+        const deltaResult = args.option("delta");
+        try testz.expectEqual(deltaResult.?.values.items.len, 3);
+        try testz.expectEqualStr(deltaResult.?.values.items[0], "one");
+        try testz.expectEqualStr(deltaResult.?.values.items[1], "two");
+        try testz.expectEqualStr(deltaResult.?.values.items[2], "three");
+    }
 }

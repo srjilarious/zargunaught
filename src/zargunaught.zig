@@ -418,7 +418,7 @@ pub const ArgParser = struct {
                 _ = parseText.popFirst();
                 parseResult.currItemPos += 1;
 
-                paramCounter += 1;
+                // paramCounter += 1;
 
                 // std.debug.print("    Option param: {s}\n", .{currVal});
             }
