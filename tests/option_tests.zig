@@ -325,6 +325,56 @@ pub fn testTooFewOrTooManyPositionalArgs() !void {
     }
 }
 
+pub fn testMultipleOptionInstanceParams() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{ .longName = "file", .shortName = "f", .description = "files" },
+        .{ .longName = "delta", .shortName = "d", .description = "" },
+    } });
+    defer parser.deinit();
+
+    // We expect multiple occurences to add to the existing list of parameters in an option result.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--file one --file two --file three");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+        const optResult = args.option("file");
+        try testz.expectEqual(optResult.?.values.items.len, 3);
+        try testz.expectEqualStr(optResult.?.values.items[0], "one");
+        try testz.expectEqualStr(optResult.?.values.items[1], "two");
+        try testz.expectEqualStr(optResult.?.values.items[2], "three");
+    }
+
+    // Mixing short and long names should be the same.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--file one -f two -f three");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+        const optResult = args.option("file");
+        try testz.expectEqual(optResult.?.values.items.len, 3);
+        try testz.expectEqualStr(optResult.?.values.items[0], "one");
+        try testz.expectEqualStr(optResult.?.values.items[1], "two");
+        try testz.expectEqualStr(optResult.?.values.items[2], "three");
+    }
+
+    // Mixing other options in the middle should also be fine.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--file one -d -f two -d -f three");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 2);
+        const optResult = args.option("file");
+        try testz.expectEqual(optResult.?.values.items.len, 3);
+        try testz.expectEqualStr(optResult.?.values.items[0], "one");
+        try testz.expectEqualStr(optResult.?.values.items[1], "two");
+        try testz.expectEqualStr(optResult.?.values.items[2], "three");
+    }
+}
+
 pub fn testOptionStacking() !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
         .{ .longName = "verbose", .shortName = "v", .description = "log verbosity", .maxOccurences = 5 },

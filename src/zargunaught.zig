@@ -54,8 +54,7 @@ pub const Option = struct {
     longName: []const u8,
     shortName: []const u8 = "",
     description: []const u8 = "",
-    // By default, an option can only appear once
-    maxOccurences: ?u8 = 1,
+    maxOccurences: ?u8 = null,
     minNumParams: ?u8 = null,
     maxNumParams: ?u8 = null,
     default: ?DefaultValue = null,
