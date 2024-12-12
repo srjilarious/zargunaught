@@ -304,24 +304,28 @@ pub const ArgParser = struct {
         self.groupData.deinit();
     }
 
-    // pub fn description(self: *ArgParser, desc: []const u8) *ArgParser {
-    //     self.description = desc;
-    //     return self;
-    // }
-    //
-    // pub fn usage(self: *ArgParser, use: []const u8) *ArgParser {
-    //     self.usage = use;
-    //     return self;
-    // }
-    //
-    // pub fn withOptions(self: *ArgParser, opts: []const Option) ParserConfigError!*ArgParser {
-    //     try self.options.addOptions(opts);
-    //     return self;
-    // }
-    //
-    // fn handleOption(parseResult: *ArgParserResult, opt: ?Option) {
-    //
-    // }
+    fn updateOptionResultForOption(parseResult: *ArgParserResult, opt: *const Option) !*OptionResult {
+        const existing = parseResult.option(opt.longName);
+        var optResult = blk: {
+            if (existing) |existingOptResult| {
+                break :blk existingOptResult;
+            } else {
+                const ores = OptionResult.init(opt.longName);
+                try parseResult.options.append(ores);
+                break :blk parseResult.option(opt.longName).?;
+            }
+        };
+
+        optResult.numOccurences += 1;
+
+        if (opt.maxOccurences != null) {
+            if (optResult.numOccurences > opt.maxOccurences.?) {
+                return error.TooManyOptionOccurences;
+            }
+        }
+
+        return optResult;
+    }
 
     fn parseOption(parseText: *ArgQueue, parseResult: *ArgParserResult, availableOpts: *const OptionList, unsetOptions: *std.ArrayList([]const u8)) !void {
         if (parseText.len == 0) return;
@@ -338,6 +342,7 @@ pub const ArgParser = struct {
 
         var optName: []const u8 = undefined;
         var opt: ?Option = null;
+        var optResult: *OptionResult = undefined;
 
         if (optFullName[0] == '-' and optFullName[1] == '-') {
             optName = optFullName[2..];
@@ -356,6 +361,7 @@ pub const ArgParser = struct {
                 return;
             } else {
                 opt = availableOpts.findLongOption(optName);
+                optResult = try updateOptionResultForOption(parseResult, &opt.?);
             }
         }
         // Handle single (or stacked) short option(s)
@@ -366,23 +372,8 @@ pub const ArgParser = struct {
                 opt = optFindResult.opt;
                 if (optFindResult.opt == null) break;
 
-                const existing = parseResult.option(opt.?.longName);
-                var optResult = blk: {
-                    if (existing) |existingOptResult| {
-                        break :blk existingOptResult;
-                    } else {
-                        const ores = OptionResult.init(opt.?.longName);
-                        try parseResult.options.append(ores);
-                        break :blk parseResult.option(opt.?.longName).?;
-                    }
-                };
-                optResult.numOccurences += 1;
-                if (opt.?.maxOccurences != null) {
-                    if (optResult.numOccurences > opt.?.maxOccurences.?) {
-                        return error.TooManyOptionOccurences;
-                    }
-                }
-
+                // Create option result an update number of occurences.
+                optResult = try updateOptionResultForOption(parseResult, &opt.?);
                 optName = optFindResult.remaining;
             }
         }
@@ -390,18 +381,8 @@ pub const ArgParser = struct {
         _ = parseText.popFirst();
         parseResult.currItemPos += 1;
 
+        // Handle parameters for the option result (last one in a stacked short option case)
         if (opt != null) {
-            const existing = parseResult.option(opt.?.longName);
-            var optResult = blk: {
-                if (existing) |existingOptResult| {
-                    break :blk existingOptResult;
-                } else {
-                    const ores = OptionResult.init(opt.?.longName);
-                    try parseResult.options.append(ores);
-                    break :blk parseResult.option(opt.?.longName).?;
-                }
-            };
-
             var paramCounter: usize = 0;
             while (parseText.len > 0 and
                 (opt.?.maxNumParams == null or
@@ -416,12 +397,9 @@ pub const ArgParser = struct {
                 optResult.values.append(currVal) catch return;
                 _ = parseText.popFirst();
                 parseResult.currItemPos += 1;
-
-                // paramCounter += 1;
-
-                // std.debug.print("    Option param: {s}\n", .{currVal});
             }
 
+            // TODO: must be done at end of parsing once multiple options have been handled.
             if (opt.?.minNumParams != null and optResult.values.items.len < opt.?.minNumParams.?) {
                 return ParseError.TooFewOptionParams;
             }

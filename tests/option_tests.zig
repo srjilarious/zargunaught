@@ -341,6 +341,7 @@ pub fn testMultipleOptionInstanceParams() !void {
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("file");
         try testz.expectEqual(optResult.?.values.items.len, 3);
+        try testz.expectEqual(optResult.?.numOccurences, 3);
         try testz.expectEqualStr(optResult.?.values.items[0], "one");
         try testz.expectEqualStr(optResult.?.values.items[1], "two");
         try testz.expectEqualStr(optResult.?.values.items[2], "three");
@@ -355,6 +356,7 @@ pub fn testMultipleOptionInstanceParams() !void {
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("file");
         try testz.expectEqual(optResult.?.values.items.len, 3);
+        try testz.expectEqual(optResult.?.numOccurences, 3);
         try testz.expectEqualStr(optResult.?.values.items[0], "one");
         try testz.expectEqualStr(optResult.?.values.items[1], "two");
         try testz.expectEqualStr(optResult.?.values.items[2], "three");
@@ -368,6 +370,7 @@ pub fn testMultipleOptionInstanceParams() !void {
         const args = try parser.parseArray(sysv);
         try testz.expectEqual(args.options.items.len, 2);
         const optResult = args.option("file");
+        try testz.expectEqual(optResult.?.numOccurences, 3);
         try testz.expectEqual(optResult.?.values.items.len, 3);
         try testz.expectEqualStr(optResult.?.values.items[0], "one");
         try testz.expectEqualStr(optResult.?.values.items[1], "two");
