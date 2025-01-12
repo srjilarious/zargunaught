@@ -1,0 +1,58 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Test",
+      "program": "${workspaceFolder}/zig-out/bin/tests",
+      "preLaunchTask": "build",
+      "args": ["-vs"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Basic example",
+      "program": "${workspaceFolder}/zig-out/bin/basic",
+      "preLaunchTask": "build",
+      "args": ["transmogrify", "-i", "a vampire", "--alpha", "--gamma", "1234", "3456", "56678"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    
+    // {
+    //   "type": "zig",
+    //   "request": "launch",
+    //   "name": "Debug unit_tests",
+    //   "program": "${workspaceFolder}/zig-out/bin/unit_tests",
+    //   "cwd": "${workspaceFolder}/zig-out/bin/",
+    //   "args": ["verbose"]
+    // },
+    // {
+    //   "type": "zig",
+    //   "request": "launch",
+    //   "name": "Debug tile_load_test",
+    //   "program": "${workspaceFolder}/zig-out/bin/tile_load_test",
+    //   "cwd": "${workspaceFolder}/zig-out/bin/",
+    //   "args": []
+    // },
+    // {
+    //   "type": "zig",
+    //   "request": "launch",
+    //   "name": "Debug flecs_test",
+    //   "program": "${workspaceFolder}/zig-out/bin/flecs_test",
+    //   "cwd": "${workspaceFolder}/zig-out/bin/",
+    //   "args": []
+    // },
+    // {
+    //   "type": "zig",
+    //   "request": "launch",
+    //   "name": "Debug text_rendering",
+    //   "program": "${workspaceFolder}/zig-out/bin/text_rendering",
+    //   "cwd": "${workspaceFolder}/zig-out/bin/",
+    //   "args": []
+    // }
+  ]
+}

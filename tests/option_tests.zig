@@ -502,3 +502,51 @@ pub fn testOptionStackingWithLastParams() !void {
         try testz.expectEqualStr(deltaResult.?.values.items[2], "three");
     }
 }
+
+pub fn testOptionStackingWithOptionsWithoutShortName() !void {
+    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
+        .{
+            .longName = "gamma",
+            .shortName = "",
+            .description = "",
+        },
+        .{
+            .longName = "verbose",
+            .shortName = "v",
+            .description = "log verbosity",
+            .maxOccurences = 5,
+            .maxNumParams = 0,
+        },
+        .{
+            .longName = "delta",
+            .shortName = "",
+            .description = "",
+            .maxNumParams = 3,
+        },
+    } });
+    defer parser.deinit();
+
+    // There was a bug where if an early ption in the arg parser didn't have a short name,
+    // the option stacking would never end until overflowing the number of occurences.
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-v");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 1);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 1);
+    }
+
+    {
+        const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvv --delta");
+        defer std.heap.page_allocator.free(sysv);
+
+        const args = try parser.parseArray(sysv);
+        try testz.expectEqual(args.options.items.len, 2);
+        const optResult = args.option("verbose");
+        try testz.expectEqual(optResult.?.numOccurences, 3);
+        const deltaResult = args.option("delta");
+        try testz.expectEqual(deltaResult.?.numOccurences, 1);
+    }
+}

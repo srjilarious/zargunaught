@@ -1,5 +1,5 @@
 const std = @import("std");
-const ArgQueue = std.TailQueue([]const u8);
+const ArgQueue = std.DoublyLinkedList([]const u8);
 
 pub const utils = @import("./utils.zig");
 pub const help = @import("./helptext.zig");
@@ -33,20 +33,20 @@ const DefaultParameter = struct { value: []const u8 };
 const DefaultOption = struct { on: bool = true };
 
 pub const DefaultValue = union(enum) {
-    params: DefaultParameters,
-    param: DefaultParameter,
-    set: DefaultOption,
+    _params: DefaultParameters,
+    _param: DefaultParameter,
+    _set: DefaultOption,
 
     pub fn params(vals: []const []const u8) DefaultValue {
-        return DefaultValue{ .params = .{ .values = vals } };
+        return DefaultValue{ ._params = .{ .values = vals } };
     }
 
     pub fn param(val: []const u8) DefaultValue {
-        return DefaultValue{ .param = .{ .value = val } };
+        return DefaultValue{ ._param = .{ .value = val } };
     }
 
     pub fn set() DefaultValue {
-        return DefaultValue{ .set = .{ .on = true } };
+        return DefaultValue{ ._set = .{ .on = true } };
     }
 };
 
@@ -142,7 +142,8 @@ pub const OptionList = struct {
     pub fn findShortOption(self: *const OptionList, optName: []const u8) OptionFindResult {
         for (self.data.items) |opt| {
             // Allow short option names to stack.
-            if (std.mem.startsWith(u8, optName, opt.shortName)) {
+
+            if (opt.shortName.len > 0 and std.mem.startsWith(u8, optName, opt.shortName)) {
                 return .{ .opt = opt, .remaining = optName[opt.shortName.len..] };
             }
         }
@@ -372,7 +373,7 @@ pub const ArgParser = struct {
                 opt = optFindResult.opt;
                 if (optFindResult.opt == null) break;
 
-                // Create option result an update number of occurences.
+                // Create option result and update number of occurences.
                 optResult = try updateOptionResultForOption(parseResult, &opt.?);
                 optName = optFindResult.remaining;
             }
@@ -515,17 +516,17 @@ pub const ArgParser = struct {
                 const defaultVal = opt.default.?;
                 var optResult = OptionResult.init(opt.longName);
                 switch (defaultVal) {
-                    .params => |p| {
+                    ._params => |p| {
                         for (p.values) |pi| {
                             try optResult.values.append(pi);
                         }
                         try parseResult.options.append(optResult);
                     },
-                    .param => |p| {
+                    ._param => |p| {
                         try optResult.values.append(p.value);
                         try parseResult.options.append(optResult);
                     },
-                    .set => |s| {
+                    ._set => |s| {
                         // You could specify a default of not set, so handle
                         // that case too.
                         if (s.on) {
