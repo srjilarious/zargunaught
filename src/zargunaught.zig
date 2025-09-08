@@ -1,5 +1,5 @@
 const std = @import("std");
-const ArgQueue = std.DoublyLinkedList([]const u8);
+// const ArgQueue = std.DoublyLinkedList;
 
 pub const utils = @import("./utils.zig");
 pub const help = @import("./helptext.zig");
@@ -19,6 +19,7 @@ pub const ParseError = error{
     TooFewOptionParams,
     TooFewPositionalArguments,
     TooManyPositionalArguments,
+    StackedOptionCantTakeParams,
 };
 
 // Used to provide a list of parameters to an option when it takes
@@ -50,11 +51,62 @@ pub const DefaultValue = union(enum) {
     }
 };
 
+const ArgQueue = struct {
+    list: std.DoublyLinkedList,
+    alloc: std.mem.Allocator,
+    len: usize,
+
+    const Self = @This();
+
+    const ArgQueueNode = struct {
+        data: []const u8,
+        node: std.DoublyLinkedList.Node = .{},
+    };
+
+    pub fn init(alloc: std.mem.Allocator) Self {
+        return ArgQueue{ .list = .{}, .alloc = alloc, .len = 0 };
+    }
+
+    pub fn deinit(self: *Self) void {
+        // TODO: deallocate the nodes themselves.
+        while (self.popFirst() != null) {}
+    }
+
+    pub fn append(self: *Self, data: []const u8) void {
+        const new_node = self.alloc.create(ArgQueueNode) catch unreachable;
+        new_node.* = ArgQueueNode{ .data = data };
+        self.list.append(&new_node.node);
+        self.len += 1;
+    }
+
+    pub fn peekFirst(self: *const Self) ?[]const u8 {
+        if (self.list.first == null) return null;
+        const aq: *ArgQueueNode = @fieldParentPtr("node", self.list.first.?);
+        return aq.data;
+    }
+
+    pub fn popFirst(self: *Self) ?[]const u8 {
+        if (self.list.first == null) return null;
+        const aq: *ArgQueueNode = @fieldParentPtr("node", self.list.first.?);
+        _ = self.list.popFirst();
+        self.len -= 1;
+        return aq.data;
+    }
+
+    pub fn isNextItemLikelyAnOption(self: *const Self) bool {
+        // TODO: This might fail for a negative number.
+        if (self.list.first == null) return false;
+        const frontData = self.peekFirst().?;
+        return frontData.len > 0 and frontData[0] == '-';
+    }
+};
+
 pub const Option = struct {
     longName: []const u8,
     shortName: []const u8 = "",
     description: []const u8 = "",
-    maxOccurences: ?u8 = null,
+    // By default, an option can only appear once
+    maxOccurences: ?u8 = 1,
     minNumParams: ?u8 = null,
     maxNumParams: ?u8 = null,
     default: ?DefaultValue = null,
@@ -66,16 +118,15 @@ pub const OptionResult = struct {
     numOccurences: u8,
 
     pub fn init(name: []const u8) OptionResult {
-        // TODO: fix allocator.
         return .{
             .name = name,
-            .values = std.ArrayList([]const u8).init(std.heap.page_allocator),
+            .values = .{},
             .numOccurences = 0,
         };
     }
 
-    pub fn deinit(self: *OptionResult) void {
-        self.values.deinit();
+    pub fn deinit(self: *OptionResult, alloc: std.mem.Allocator) void {
+        self.values.deinit(alloc);
     }
 };
 
@@ -87,14 +138,14 @@ const OptionFindResult = struct {
 
 pub const OptionList = struct {
     data: std.ArrayList(Option),
+    alloc: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) OptionList {
-        const options = std.ArrayList(Option).init(allocator);
-        return OptionList{ .data = options };
+        return OptionList{ .data = .{}, .alloc = allocator };
     }
 
-    pub fn deinit(self: OptionList) void {
-        self.data.deinit();
+    pub fn deinit(self: *OptionList) void {
+        self.data.deinit(self.alloc);
     }
 
     pub fn addOptions(self: *OptionList, opts: []const Option) ParserConfigError!void {
@@ -126,7 +177,7 @@ pub const OptionList = struct {
             }
         }
 
-        self.data.append(opt) catch unreachable;
+        self.data.append(self.alloc, opt) catch unreachable;
     }
 
     pub fn findLongOption(self: *const OptionList, optName: []const u8) ?Option {
@@ -141,9 +192,10 @@ pub const OptionList = struct {
 
     pub fn findShortOption(self: *const OptionList, optName: []const u8) OptionFindResult {
         for (self.data.items) |opt| {
-            // Allow short option names to stack.
+            if (opt.shortName.len == 0) continue;
 
-            if (opt.shortName.len > 0 and std.mem.startsWith(u8, optName, opt.shortName)) {
+            // Allow short option names to stack.
+            if (std.mem.startsWith(u8, optName, opt.shortName)) {
                 return .{ .opt = opt, .remaining = optName[opt.shortName.len..] };
             }
         }
@@ -156,23 +208,23 @@ pub const Command = struct { name: []const u8, description: ?[]const u8 = null, 
 
 pub const CommandList = struct {
     data: std.ArrayList(Command),
+    alloc: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) CommandList {
-        const data = std.ArrayList(Command).init(allocator);
-        return CommandList{ .data = data };
+        return CommandList{ .data = .{}, .alloc = allocator };
     }
 
-    pub fn deinit(self: CommandList) void {
-        for (self.data.items) |cmd| {
-            cmd.options.deinit();
+    pub fn deinit(self: *CommandList) void {
+        for (0..self.data.items.len) |idx| {
+            self.data.items[idx].options.deinit();
         }
 
-        self.data.deinit();
+        self.data.deinit(self.alloc);
     }
 
     pub fn addMany(self: *CommandList, cmds: []const Command) ParserConfigError!void {
         for (cmds) |c| {
-            try self.add(c);
+            try self.add(self.alloc, c);
         }
     }
 
@@ -187,7 +239,7 @@ pub const CommandList = struct {
             }
         }
 
-        self.data.append(cmd) catch unreachable;
+        self.data.append(self.alloc, cmd) catch unreachable;
     }
 
     pub fn find(self: *CommandList, cmdName: []const u8) ?Command {
@@ -245,12 +297,20 @@ pub const ArgParser = struct {
     options: OptionList,
 
     groupData: std.StringHashMap(*GroupData),
+
     // Contains all commands, even grouped ones.
     commands: CommandList,
     alloc: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, opts: ArgParserOpts) !ArgParser {
-        var argsParser = ArgParser{ .name = "", .parserOpts = opts, .options = OptionList.init(allocator), .commands = CommandList.init(allocator), .groupData = std.StringHashMap(*GroupData).init(allocator), .alloc = allocator };
+        var argsParser = ArgParser{
+            .name = "",
+            .parserOpts = opts,
+            .options = OptionList.init(allocator),
+            .commands = CommandList.init(allocator),
+            .groupData = std.StringHashMap(*GroupData).init(allocator),
+            .alloc = allocator,
+        };
 
         if (opts.name != null) {
             argsParser.name = opts.name.?;
@@ -268,7 +328,7 @@ pub const ArgParser = struct {
                     try cmdItem.options.addOptions(cmd.opts.?);
                 }
 
-                try argsParser.commands.data.append(cmdItem);
+                try argsParser.commands.data.append(allocator, cmdItem);
             }
         }
 
@@ -289,7 +349,7 @@ pub const ArgParser = struct {
                         try cmdItem.options.addOptions(cmd.opts.?);
                     }
 
-                    try argsParser.commands.data.append(cmdItem);
+                    try argsParser.commands.data.append(allocator, cmdItem);
                 }
             }
         }
@@ -305,33 +365,15 @@ pub const ArgParser = struct {
         self.groupData.deinit();
     }
 
-    fn updateOptionResultForOption(parseResult: *ArgParserResult, opt: *const Option) !*OptionResult {
-        const existing = parseResult.option(opt.longName);
-        var optResult = blk: {
-            if (existing) |existingOptResult| {
-                break :blk existingOptResult;
-            } else {
-                const ores = OptionResult.init(opt.longName);
-                try parseResult.options.append(ores);
-                break :blk parseResult.option(opt.longName).?;
-            }
-        };
-
-        optResult.numOccurences += 1;
-
-        if (opt.maxOccurences != null) {
-            if (optResult.numOccurences > opt.maxOccurences.?) {
-                return error.TooManyOptionOccurences;
-            }
-        }
-
-        return optResult;
-    }
-
-    fn parseOption(parseText: *ArgQueue, parseResult: *ArgParserResult, availableOpts: *const OptionList, unsetOptions: *std.ArrayList([]const u8)) !void {
+    fn parseOption(
+        parseText: *ArgQueue,
+        parseResult: *ArgParserResult,
+        availableOpts: *const OptionList,
+        unsetOptions: *std.ArrayList([]const u8),
+    ) !void {
         if (parseText.len == 0) return;
 
-        const optFullName = parseText.first.?.data;
+        const optFullName = parseText.peekFirst().?;
 
         if (std.mem.eql(u8, optFullName, "-") or
             std.mem.eql(u8, optFullName, "--"))
@@ -343,7 +385,7 @@ pub const ArgParser = struct {
 
         var optName: []const u8 = undefined;
         var opt: ?Option = null;
-        var optResult: *OptionResult = undefined;
+        var stacked = false;
 
         if (optFullName[0] == '-' and optFullName[1] == '-') {
             optName = optFullName[2..];
@@ -358,49 +400,98 @@ pub const ArgParser = struct {
 
                 _ = parseText.popFirst();
                 parseResult.currItemPos += 1;
-                try unsetOptions.append(optName);
+                try unsetOptions.append(parseResult.alloc, optName);
                 return;
             } else {
                 opt = availableOpts.findLongOption(optName);
-                optResult = try updateOptionResultForOption(parseResult, &opt.?);
             }
         }
         // Handle single (or stacked) short option(s)
         else if (optFullName[0] == '-') {
             optName = optFullName[1..];
-            while (optName.len > 0) {
+            stacked = optName.len > 1;
+            if (stacked) {
+                while (optName.len > 0) {
+                    const optFindResult = availableOpts.findShortOption(optName);
+                    opt = optFindResult.opt;
+                    if (optFindResult.opt == null) break;
+
+                    optName = optFindResult.remaining;
+
+                    const existing = parseResult.option(opt.?.longName);
+                    var optResult = blk: {
+                        if (existing) |existingOptResult| {
+                            break :blk existingOptResult;
+                        } else {
+                            const ores = OptionResult.init(opt.?.longName);
+                            try parseResult.options.append(parseResult.alloc, ores);
+                            break :blk parseResult.option(opt.?.longName).?;
+                        }
+                    };
+
+                    // If this option takes parameters, we can't be stacked.
+                    if (opt.?.minNumParams != null and opt.?.minNumParams.? > 0 and stacked) {
+                        return ParseError.StackedOptionCantTakeParams;
+                    }
+
+                    optResult.numOccurences += 1;
+
+                    if (opt.?.maxOccurences != null) {
+                        if (optResult.numOccurences > opt.?.maxOccurences.?) {
+                            return error.TooManyOptionOccurences;
+                        }
+                    }
+                }
+
+                _ = parseText.popFirst();
+                parseResult.currItemPos += 1;
+                return;
+            } else {
                 const optFindResult = availableOpts.findShortOption(optName);
                 opt = optFindResult.opt;
-                if (optFindResult.opt == null) break;
-
-                // Create option result and update number of occurences.
-                optResult = try updateOptionResultForOption(parseResult, &opt.?);
-                optName = optFindResult.remaining;
             }
         }
 
         _ = parseText.popFirst();
         parseResult.currItemPos += 1;
 
-        // Handle parameters for the option result (last one in a stacked short option case)
+        // Short options alone can take parameters, but not stacked ones.
         if (opt != null) {
+            const existing = parseResult.option(opt.?.longName);
+            var optResult = blk: {
+                if (existing) |existingOptResult| {
+                    break :blk existingOptResult;
+                } else {
+                    const ores = OptionResult.init(opt.?.longName);
+                    try parseResult.options.append(parseResult.alloc, ores);
+                    break :blk parseResult.option(opt.?.longName).?;
+                }
+            };
+
+            optResult.numOccurences += 1;
+            if (opt.?.maxOccurences != null) {
+                if (optResult.numOccurences > opt.?.maxOccurences.?) {
+                    return error.TooManyOptionOccurences;
+                }
+            }
+
             var paramCounter: usize = 0;
             while (parseText.len > 0 and
                 (opt.?.maxNumParams == null or
-                // TODO: Fix maxNumParams == 0 case for min params.
-                paramCounter < opt.?.maxNumParams.?)) : (paramCounter += 1)
+                    // TODO: Fix maxNumParams == 0 case for min params.
+                    paramCounter < opt.?.maxNumParams.?)) : (paramCounter += 1)
             {
-                const currVal = parseText.first.?.data;
+                const currVal = parseText.peekFirst().?;
+
                 if (currVal[0] == '-' and currVal.len > 1) {
                     if (!std.ascii.isDigit(currVal[1])) break;
                 }
 
-                optResult.values.append(currVal) catch return;
+                optResult.values.append(parseResult.alloc, currVal) catch return;
                 _ = parseText.popFirst();
                 parseResult.currItemPos += 1;
             }
 
-            // TODO: must be done at end of parsing once multiple options have been handled.
             if (opt.?.minNumParams != null and optResult.values.items.len < opt.?.minNumParams.?) {
                 return ParseError.TooFewOptionParams;
             }
@@ -411,16 +502,9 @@ pub const ArgParser = struct {
         return;
     }
 
-    fn isNextItemLikelyAnOption(queue: *const ArgQueue) bool {
-        return queue.len > 0 and
-            queue.first != null and
-            queue.first.?.data.len > 0 and
-            queue.first.?.data[0] == '-';
-    }
-
     pub fn parse(self: *ArgParser) !ArgParserResult {
-        var arr = std.ArrayList([]const u8).init(self.alloc);
-        defer arr.deinit();
+        var arr: std.ArrayList([]const u8) = .{};
+        defer arr.deinit(self.alloc);
 
         var args = try std.process.argsWithAllocator(self.alloc);
         _ = args.next(); // Skip the program name.
@@ -430,7 +514,7 @@ pub const ArgParser = struct {
             if (curr == null) break;
 
             const argSlice = utils.cStrToSlice(curr.?);
-            try arr.append(argSlice);
+            try arr.append(self.alloc, argSlice);
         }
 
         return self.parseArray(arr.items);
@@ -438,9 +522,9 @@ pub const ArgParser = struct {
 
     // TODO: Add in returning state for case where we hit `-`
     pub fn parseArgsForOptions(parseResult: *ArgParserResult, availableOpts: *const OptionList, parseText: *ArgQueue, unsetOptions: *std.ArrayList([]const u8)) !void {
-        while (isNextItemLikelyAnOption(parseText)) {
+        while (parseText.isNextItemLikelyAnOption()) {
             // Check if we ran into a number
-            const frontData = parseText.first.?.data;
+            const frontData = parseText.peekFirst().?;
             if (frontData.len > 1 and std.ascii.isDigit(frontData[1])) break;
 
             // TODO: change to catching and adding a better error.
@@ -450,19 +534,14 @@ pub const ArgParser = struct {
 
     // Parses the array of string slices.
     pub fn parseArray(self: *ArgParser, args: [][]const u8) !ArgParserResult {
-        // for (self.options.options.items) |opt| {
-        //     std.debug.print("Option: --{s}, -{s}\n", .{ opt.longName, opt.shortName });
-        // }
+        var parseText = ArgQueue.init(self.alloc);
+        defer parseText.deinit();
 
-        var parseText = ArgQueue{};
         for (args) |arg| {
-            const new_node = self.alloc.create(ArgQueue.Node) catch unreachable;
-            new_node.* = ArgQueue.Node{ .prev = undefined, .next = undefined, .data = arg };
-            parseText.append(new_node);
+            parseText.append(arg);
         }
 
         var parseResult = ArgParserResult.init(self.alloc);
-        // var lastOpt: ?OptionResult = null;
 
         // Create a temporary option list to use to find combined global and command level options.
         // Allso used for handling checking for adding in default values at the end.
@@ -471,10 +550,8 @@ pub const ArgParser = struct {
 
         try availableOpts.addOptions(self.options.data.items);
 
-        // if(parseText.len == 0) return parseResult;
-
-        var unsetOptions = std.ArrayList([]const u8).init(self.alloc);
-        defer unsetOptions.deinit();
+        var unsetOptions: std.ArrayList([]const u8) = .{};
+        defer unsetOptions.deinit(self.alloc);
 
         if (parseText.len > 0) {
             try parseArgsForOptions(&parseResult, &self.options, &parseText, &unsetOptions);
@@ -482,7 +559,7 @@ pub const ArgParser = struct {
 
         if (parseText.len > 0) {
             // Setup command list.
-            const frontData = parseText.first.?.data;
+            const frontData = parseText.peekFirst().?;
 
             // Handle looking for commands after any initial global options.
             for (0..self.commands.data.items.len) |cmdIdx| {
@@ -518,19 +595,19 @@ pub const ArgParser = struct {
                 switch (defaultVal) {
                     ._params => |p| {
                         for (p.values) |pi| {
-                            try optResult.values.append(pi);
+                            try optResult.values.append(parseResult.alloc, pi);
                         }
-                        try parseResult.options.append(optResult);
+                        try parseResult.options.append(parseResult.alloc, optResult);
                     },
                     ._param => |p| {
-                        try optResult.values.append(p.value);
-                        try parseResult.options.append(optResult);
+                        try optResult.values.append(parseResult.alloc, p.value);
+                        try parseResult.options.append(parseResult.alloc, optResult);
                     },
                     ._set => |s| {
                         // You could specify a default of not set, so handle
                         // that case too.
                         if (s.on) {
-                            try parseResult.options.append(optResult);
+                            try parseResult.options.append(parseResult.alloc, optResult);
                         }
                     },
                 }
@@ -539,12 +616,12 @@ pub const ArgParser = struct {
 
         // The rest of the arguments are positional.
         while (parseText.len > 0) {
-            const posData = parseText.first.?.data;
-            try parseResult.positional.append(posData);
+            const posData = parseText.peekFirst().?;
+            try parseResult.positional.append(parseResult.alloc, posData);
             _ = parseText.popFirst();
         }
 
-        // Check for too feww or too many positional arguments.
+        // Check for too few or too many positional arguments.
         if (self.parserOpts.minNumPositionalArgs != null) {
             const minPosArgs = self.parserOpts.minNumPositionalArgs.?;
             if (parseResult.positional.items.len < minPosArgs) {
@@ -563,20 +640,27 @@ pub const ArgParser = struct {
     }
 };
 
+/// The result from parsing arguments.
 pub const ArgParserResult = struct {
-    // optionsList: OptionList, // Subparser options
+    alloc: std.mem.Allocator,
     currItemPos: usize,
     options: std.ArrayList(OptionResult),
     command: ?*Command,
     positional: std.ArrayList([]const u8),
 
     pub fn init(allocator: std.mem.Allocator) ArgParserResult {
-        return .{ .currItemPos = 0, .options = std.ArrayList(OptionResult).init(allocator), .command = null, .positional = std.ArrayList([]const u8).init(allocator) };
+        return .{
+            .alloc = allocator,
+            .currItemPos = 0,
+            .options = .{},
+            .command = null,
+            .positional = .{},
+        };
     }
 
     pub fn deinit(self: *ArgParserResult) void {
-        self.options.deinit();
-        self.positional.deinit();
+        self.options.deinit(self.alloc);
+        self.positional.deinit(self.alloc);
     }
 
     pub fn hasOption(self: *ArgParserResult, name: []const u8) bool {

@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
     _ = addExample(b, target, optimize, "basic", "examples/basic.zig", zargsMod);
 
     var testsExe = addExample(b, target, optimize, "tests", "tests/main.zig", zargsMod);
+    testsExe.use_llvm = true; // Force LLVM backend for debugging.
     const testzMod = b.dependency("testz", .{});
     testsExe.root_module.addImport("testz", testzMod.module("testz"));
 }
@@ -29,9 +30,11 @@ pub fn build(b: *std.Build) void {
 fn addExample(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, comptime name: []const u8, root_src_path: []const u8, zargsMod: *std.Build.Module) *std.Build.Step.Compile {
     const exe = b.addExecutable(.{
         .name = name,
-        .root_source_file = b.path(root_src_path),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.addModule("main", .{
+            .root_source_file = b.path(root_src_path),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     exe.root_module.addImport("zargunaught", zargsMod);
 

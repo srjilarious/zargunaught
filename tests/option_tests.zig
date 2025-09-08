@@ -327,8 +327,8 @@ pub fn testTooFewOrTooManyPositionalArgs() !void {
 
 pub fn testMultipleOptionInstanceParams() !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "file", .shortName = "f", .description = "files" },
-        .{ .longName = "delta", .shortName = "d", .description = "" },
+        .{ .longName = "file", .shortName = "f", .description = "files", .maxOccurences = 4 },
+        .{ .longName = "delta", .shortName = "d", .description = "", .maxOccurences = 2 },
     } });
     defer parser.deinit();
 
@@ -482,7 +482,8 @@ pub fn testOptionStackingWithLastParams() !void {
         try testz.expectEqual(deltaResult.?.values.items.len, 0);
     }
 
-    // Check that we can see multiple occurences of stacked options, plus the last can get params.
+    // Check that we can see multiple occurences of stacked options, extra params after stacks show
+    // as positional.
     {
         const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-vvgvvd one two three");
         defer std.heap.page_allocator.free(sysv);
@@ -496,10 +497,11 @@ pub fn testOptionStackingWithLastParams() !void {
         try testz.expectEqual(gammaResult.?.values.items.len, 0);
 
         const deltaResult = args.option("delta");
-        try testz.expectEqual(deltaResult.?.values.items.len, 3);
-        try testz.expectEqualStr(deltaResult.?.values.items[0], "one");
-        try testz.expectEqualStr(deltaResult.?.values.items[1], "two");
-        try testz.expectEqualStr(deltaResult.?.values.items[2], "three");
+        try testz.expectEqual(deltaResult.?.values.items.len, 0);
+        try testz.expectEqual(args.positional.items.len, 3);
+        try testz.expectEqualStr(args.positional.items[0], "one");
+        try testz.expectEqualStr(args.positional.items[1], "two");
+        try testz.expectEqualStr(args.positional.items[2], "three");
     }
 }
 
@@ -526,7 +528,7 @@ pub fn testOptionStackingWithOptionsWithoutShortName() !void {
     } });
     defer parser.deinit();
 
-    // There was a bug where if an early ption in the arg parser didn't have a short name,
+    // There was a bug where if an early option in the arg parser didn't have a short name,
     // the option stacking would never end until overflowing the number of occurences.
     {
         const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "-v");
