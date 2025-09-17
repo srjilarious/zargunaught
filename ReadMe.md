@@ -2,8 +2,8 @@
 
 ![Logo](images/zargunaught.png)
 
-![Version Badge](https://img.shields.io/badge/Version-0.6.1-brightgreen)
-![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.14.0-%23f7a41d?logo=zig)
+![Version Badge](https://img.shields.io/badge/Version-1.0.0-brightgreen)
+![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.15.1-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 Zargunaught is an argument parsing library for zig, based off of my earlier `argunaught` C++ library.  It features a simple API for configuring global options, commands and command specific options.
@@ -27,7 +27,7 @@ It doesn't try to map your options into a structure or use meta programming tric
 the easiest way to use `zargunaught` in your zig program is to grab the latest tag:
 
 ```
-zig fetch https://github.com/srjilarious/zargunaught/archive/refs/tags/v0.5.0.tar.gz
+zig fetch https://github.com/srjilarious/zargunaught/archive/refs/tags/v1.0.0.tar.gz
 ```
 
 and then add it as a dependency in your `build.zig`:
