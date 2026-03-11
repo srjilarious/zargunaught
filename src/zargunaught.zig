@@ -68,8 +68,13 @@ const ArgQueue = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        // TODO: deallocate the nodes themselves.
-        while (self.popFirst() != null) {}
+        if (self.list.first == null) return;
+        while (self.list.pop()) |node| {
+            const aq: *ArgQueueNode = @fieldParentPtr("node", node);
+            self.alloc.destroy(aq);
+        }
+
+        self.len = 0;
     }
 
     pub fn append(self: *Self, data: []const u8) void {
@@ -89,8 +94,10 @@ const ArgQueue = struct {
         if (self.list.first == null) return null;
         const aq: *ArgQueueNode = @fieldParentPtr("node", self.list.first.?);
         _ = self.list.popFirst();
+        const data = aq.data;
+        self.alloc.destroy(aq);
         self.len -= 1;
-        return aq.data;
+        return data;
     }
 
     pub fn isNextItemLikelyAnOption(self: *const Self) bool {
@@ -204,7 +211,12 @@ pub const OptionList = struct {
     }
 };
 
-pub const Command = struct { name: []const u8, description: ?[]const u8 = null, group: ?[]const u8 = null, options: OptionList };
+pub const Command = struct {
+    name: []const u8,
+    description: ?[]const u8 = null,
+    group: ?[]const u8 = null,
+    options: OptionList,
+};
 
 pub const CommandList = struct {
     data: std.ArrayList(Command),
@@ -659,6 +671,10 @@ pub const ArgParserResult = struct {
     }
 
     pub fn deinit(self: *ArgParserResult) void {
+        for (0..self.options.items.len) |idx| {
+            self.options.items[idx].deinit(self.alloc);
+        }
+
         self.options.deinit(self.alloc);
         self.positional.deinit(self.alloc);
     }
