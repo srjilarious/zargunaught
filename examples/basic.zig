@@ -75,7 +75,15 @@ fn basicOptionParsing() !void {
             std.debug.print("Err: {any}\n", .{err});
         };
     } else if (args.command != null) {
-        if (std.mem.eql(u8, args.command.?.name, "transmogrify")) {
+        if (std.mem.eql(u8, args.command.?.name, "sweep")) {
+            try stdout.print("Sweeping the laboratory!\n", .{});
+        } else if (std.mem.eql(u8, args.command.?.name, "lightning_bolt")) {
+            try stdout.print("Casting lightning bolt!\n", .{});
+        } else if (std.mem.eql(u8, args.command.?.name, "brew_potion")) {
+            try stdout.print("Brewing a potion!\n", .{});
+        } else if (std.mem.eql(u8, args.command.?.name, "write_scroll")) {
+            try stdout.print("Writing a scroll!\n", .{});
+        } else if (std.mem.eql(u8, args.command.?.name, "transmogrify")) {
             if (args.optionVal("into")) |into| {
                 try stdout.print("Turning you into {s}!!\n", .{into});
             } else {
