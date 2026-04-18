@@ -3,7 +3,7 @@ const std = @import("std");
 const StrArrayList = std.ArrayList([]const u8);
 
 pub fn tokenizeShellString(alloc: std.mem.Allocator, input: []const u8) ![][]const u8 {
-    var tokens = StrArrayList{};
+    var tokens: StrArrayList = .empty;
     defer tokens.deinit(alloc);
 
     var in_single_quote = false;

@@ -8,6 +8,6 @@ const Tests = testz.discoverTests(.{
     testz.Group{ .name = "Command tests", .tag = "command", .mod = @import("./command_tests.zig") },
 }, .{});
 
-pub fn main() !void {
-    try testz.testzRunner(Tests);
+pub fn main(init: std.process.Init) !void {
+    try testz.testzRunner(Tests, init.minimal.args);
 }

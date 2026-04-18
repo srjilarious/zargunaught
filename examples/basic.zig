@@ -3,11 +3,11 @@ const zargs = @import("zargunaught");
 
 const Option = zargs.Option;
 
-pub fn main() !void {
-    try basicOptionParsing();
+pub fn main(init: std.process.Init) !void {
+    try basicOptionParsing(init.minimal.args);
 }
 
-fn basicOptionParsing() !void {
+fn basicOptionParsing(process_args: std.process.Args) !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
         .name = "Test program",
         .description = "A cool test program",
@@ -58,7 +58,7 @@ fn basicOptionParsing() !void {
     });
     defer parser.deinit();
 
-    var args = parser.parse() catch |err| {
+    var args = parser.parse(process_args) catch |err| {
         std.debug.print("Error parsing args: {any}\n", .{err});
         return;
     };

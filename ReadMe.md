@@ -3,7 +3,7 @@
 ![Logo](images/zargunaught.png)
 
 ![Version Badge](https://img.shields.io/badge/Version-1.1.0-brightgreen)
-![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.15.1-%23f7a41d?logo=zig)
+![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.16.0-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 Zargunaught is an argument parsing library for zig, based off of my earlier `argunaught` C++ library.  It features a simple API for configuring global options, commands and command specific options.
@@ -48,28 +48,52 @@ here's what the help output looks like for the basic example below:
 and here's the setup code in the example:
 
 ```zig
-var parser = try zargs.argparser.init(
-    std.heap.page_allocator, .{ 
+var parser = try zargs.ArgParser.init(
+    std.heap.page_allocator, 
+    .{
         .name = "test program",
         .description = "a cool test program",
         .usage = "mostly used to transmogrify a thing into a thing.",
-        .opts = &[_]option{
-            option{ .longname = "alpha", .shortname = "a", .description = "the first option", .maxnumparams = 0 },
-            option{ .longname = "beta", .shortname = "b", .description = "another option", .maxnumparams = 1 },
-            option{ .longname = "gamma", .shortname = "g", .description = "the last option here.", .maxnumparams = -1 },
+        .opts = &[_]Option{
+            Option{
+                .longName = "alpha",
+                .shortName = "a",
+                .description = "the first option",
+                .maxNumParams = 0,
+            },
+            Option{
+                .longName = "beta",
+                .shortName = "b",
+                .description = "another option",
+                .maxNumParams = 1,
+            },
+            Option{
+                .longName = "gamma",
+                .shortName = "g",
+                .description = "the last option here.",
+                .maxNumParams = -1,
+            },
         },
         .commands = &.{
-        .{ .name = "help", .description = "prints out this help." },
-        .{ .name = "transmogrify", 
-           .opts = &.{
-                .{ .longname = "into", .shortname = "i", .description = "what you want to transform into. this is super useful if you want to change what you look like or pretend to be someone else for a prank.  highly recommended!", .maxnumparams = 1 }
-            }
-        }
-    }
-    });
+            .{
+                .name = "help",
+                .description = "prints out this help.",
+            },
+            .{ .name = "transmogrify", .opts = &.{
+                .{
+                    .longName = "into",
+                    .shortName = "i",
+                    .description = "what you want to transform into. this is super useful if you want to change what you look like or pretend to be someone else for a prank.  highly recommended!",
+                    .maxNumParams = 1,
+                },
+            },
+        },
+    },
+});
+
 defer parser.deinit();
 
-var args = parser.parse() catch |err| {
+var args = parser.parse(init.minimal.args) catch |err| {
     std.debug.print("error parsing args: {any}\n", .{err});
     return;
 };
@@ -89,7 +113,7 @@ it also handles wrapping lines of descriptions for options and commands that get
 to display the help text, you could use the following code:
 
 ```zig
-if(args.hasoption("help")) {
+if(args.hasOption("help")) {
     var help = try zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme, std.heap.page_allocator);
     defer help.deinit();
 

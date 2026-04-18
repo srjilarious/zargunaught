@@ -68,13 +68,8 @@ const ArgQueue = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        if (self.list.first == null) return;
-        while (self.list.pop()) |node| {
-            const aq: *ArgQueueNode = @fieldParentPtr("node", node);
-            self.alloc.destroy(aq);
-        }
-
-        self.len = 0;
+        // TODO: deallocate the nodes themselves.
+        while (self.popFirst() != null) {}
     }
 
     pub fn append(self: *Self, data: []const u8) void {
@@ -94,10 +89,8 @@ const ArgQueue = struct {
         if (self.list.first == null) return null;
         const aq: *ArgQueueNode = @fieldParentPtr("node", self.list.first.?);
         _ = self.list.popFirst();
-        const data = aq.data;
-        self.alloc.destroy(aq);
         self.len -= 1;
-        return data;
+        return aq.data;
     }
 
     pub fn isNextItemLikelyAnOption(self: *const Self) bool {
@@ -127,7 +120,7 @@ pub const OptionResult = struct {
     pub fn init(name: []const u8) OptionResult {
         return .{
             .name = name,
-            .values = .{},
+            .values = .empty,
             .numOccurences = 0,
         };
     }
@@ -148,7 +141,7 @@ pub const OptionList = struct {
     alloc: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) OptionList {
-        return OptionList{ .data = .{}, .alloc = allocator };
+        return OptionList{ .data = .empty, .alloc = allocator };
     }
 
     pub fn deinit(self: *OptionList) void {
@@ -211,19 +204,14 @@ pub const OptionList = struct {
     }
 };
 
-pub const Command = struct {
-    name: []const u8,
-    description: ?[]const u8 = null,
-    group: ?[]const u8 = null,
-    options: OptionList,
-};
+pub const Command = struct { name: []const u8, description: ?[]const u8 = null, group: ?[]const u8 = null, options: OptionList };
 
 pub const CommandList = struct {
     data: std.ArrayList(Command),
     alloc: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) CommandList {
-        return CommandList{ .data = .{}, .alloc = allocator };
+        return CommandList{ .data = .empty, .alloc = allocator };
     }
 
     pub fn deinit(self: *CommandList) void {
@@ -514,19 +502,15 @@ pub const ArgParser = struct {
         return;
     }
 
-    pub fn parse(self: *ArgParser) !ArgParserResult {
-        var arr: std.ArrayList([]const u8) = .{};
+    pub fn parse(self: *ArgParser, args: std.process.Args) !ArgParserResult {
+        var arr: std.ArrayList([]const u8) = .empty;
         defer arr.deinit(self.alloc);
 
-        var args = try std.process.argsWithAllocator(self.alloc);
-        _ = args.next(); // Skip the program name.
-        defer args.deinit();
-        while (true) {
-            const curr = args.next();
-            if (curr == null) break;
-
-            const argSlice = utils.cStrToSlice(curr.?);
-            try arr.append(self.alloc, argSlice);
+        var iter = try args.iterateAllocator(self.alloc);
+        _ = iter.next(); // Skip the program name.
+        defer iter.deinit();
+        while (iter.next()) |curr| {
+            try arr.append(self.alloc, curr);
         }
 
         return self.parseArray(arr.items);
@@ -562,7 +546,7 @@ pub const ArgParser = struct {
 
         try availableOpts.addOptions(self.options.data.items);
 
-        var unsetOptions: std.ArrayList([]const u8) = .{};
+        var unsetOptions: std.ArrayList([]const u8) = .empty;
         defer unsetOptions.deinit(self.alloc);
 
         if (parseText.len > 0) {
@@ -664,17 +648,13 @@ pub const ArgParserResult = struct {
         return .{
             .alloc = allocator,
             .currItemPos = 0,
-            .options = .{},
+            .options = .empty,
             .command = null,
-            .positional = .{},
+            .positional = .empty,
         };
     }
 
     pub fn deinit(self: *ArgParserResult) void {
-        for (0..self.options.items.len) |idx| {
-            self.options.items[idx].deinit(self.alloc);
-        }
-
         self.options.deinit(self.alloc);
         self.positional.deinit(self.alloc);
     }
