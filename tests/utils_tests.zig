@@ -10,34 +10,42 @@ fn compareStrArrays(expected: []const []const u8, result: []const []const u8) !v
     }
 }
 
-pub fn checkSingleStringTest() !void {
+pub fn checkSingleStringTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
     const base = "one_two_three";
     const expected = &[_][]const u8{"one_two_three"};
 
-    const result = try zargs.utils.tokenizeShellString(std.heap.page_allocator, base);
+    const result = try zargs.utils.tokenizeShellString(alloc, base);
+    defer alloc.free(result);
     try compareStrArrays(expected[0..], result);
 }
 
-pub fn checkSimpleShellStringTest() !void {
+pub fn checkSimpleShellStringTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
     const base = "one two three";
     const expected = &[_][]const u8{ "one", "two", "three" };
 
-    const result = try zargs.utils.tokenizeShellString(std.heap.page_allocator, base);
+    const result = try zargs.utils.tokenizeShellString(alloc, base);
+    defer alloc.free(result);
     try compareStrArrays(expected[0..], result);
 }
 
-pub fn checkDoubleQuotedShellStringTest() !void {
+pub fn checkDoubleQuotedShellStringTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
     const base = "one 'two three'";
     const expected = &[_][]const u8{ "one", "two three" };
 
-    const result = try zargs.utils.tokenizeShellString(std.heap.page_allocator, base);
+    const result = try zargs.utils.tokenizeShellString(alloc, base);
+    defer alloc.free(result);
     try compareStrArrays(expected[0..], result);
 }
 
-pub fn checkSingleQuoteInsideDoubleQuotes() !void {
+pub fn checkSingleQuoteInsideDoubleQuotes(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
     const base = "one 'two \"three\"'";
     const expected = &[_][]const u8{ "one", "two \"three\"" };
 
-    const result = try zargs.utils.tokenizeShellString(std.heap.page_allocator, base);
+    const result = try zargs.utils.tokenizeShellString(alloc, base);
+    defer alloc.free(result);
     try compareStrArrays(expected[0..], result);
 }

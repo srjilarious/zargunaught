@@ -2,7 +2,7 @@
 
 ![Logo](images/zargunaught.png)
 
-![Version Badge](https://img.shields.io/badge/Version-1.2.0-brightgreen)
+![Version Badge](https://img.shields.io/badge/Version-1.2.1-brightgreen)
 ![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.16.0-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -20,21 +20,21 @@ It doesn't try to map your options into a structure or use meta programming tric
 - Ability to prepend `no-` to unset a default enabled option.
 - Help text formatter with word-wrapping and basic color theming support.
 - Grouping of commands for better formatted help text.
-- `--` to stop option parsing and consider the rest of the command line as positional arugments.
+- `--` to stop option parsing and consider the rest of the command line as positional arguments.
 
 # installing
 
 the easiest way to use `zargunaught` in your zig program is to grab the latest tag:
 
 ```
-zig fetch https://github.com/srjilarious/zargunaught/archive/refs/tags/v1.0.0.tar.gz
+zig fetch --save https://github.com/srjilarious/zargunaught
 ```
 
 and then add it as a dependency in your `build.zig`:
 
 ```
 const zargsmod = b.dependency("zargunaught", .{});
-exe.root_module.addimport("zargunaught", zargsmod.module("zargunaught"));
+exe.root_module.addImport("zargunaught", zargsmod.module("zargunaught"));
 ```
 
 # example
@@ -114,6 +114,9 @@ to display the help text, you could use the following code:
 
 ```zig
 if(args.hasOption("help")) {
+    var stdout = try zargs.print.Printer.stdout(std.heap.page_allocator);
+    defer stdout.deinit();
+
     var help = try zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme, std.heap.page_allocator);
     defer help.deinit();
 
@@ -121,6 +124,16 @@ if(args.hasOption("help")) {
         std.debug.print("Err: {any}\n", .{err});
     };
 }
+```
+
+The `banner` field in `ArgParserOpts` lets you override the program name shown at the top of the help output.  If not set, the `name` field is used instead.
+
+```zig
+var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
+    .name = "myapp",
+    .banner = "My Cool App v1.0",
+    .description = "Does really cool things.",
+});
 ```
 
 ## Min/Max Parameters and Positional Arguments
@@ -135,13 +148,23 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simpl
 
 This would force the delta option to be provided with one to three parameters by the user.
 
-You can similarly configure the parser to expect a minimum and/or maximum number of positional arguments
+You can similarly configure the parser to expect a minimum and/or maximum number of positional arguments.  The optional `positionalDescription` field adds a label for positional arguments in the help text:
 
 ```zig
 var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
     .name = "Simple options",
     .minNumPositionalArgs = 1,
     .maxNumPositionalArgs = 2,
+    .positionalDescription = "<input-file> [output-file]",
+});
+```
+
+You can also provide `defaultPositionalArgs` to supply positional arguments when none are given by the user:
+
+```zig
+var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
+    .name = "Simple options",
+    .defaultPositionalArgs = zargs.DefaultValue.params(&.{ "default.txt" }),
 });
 ```
 
@@ -177,7 +200,7 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simpl
 
 ## Command Groups
 
-Command groups are useful for gathering a number of related commands together when printing out the help text.  they can be defined in the `ArgParser` initial configuration by providing a list of `CommandGroup` structs, that are simply a `name` and an array of `Commands`:
+Command groups are useful for gathering a number of related commands together when printing out the help text.  They can be defined in the `ArgParser` initial configuration by providing a list of `GroupOpt` structs with a `name`, optional `description`, and an array of commands:
 
 ```zig
 var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ 
@@ -197,6 +220,7 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
     .groups = &.{
         .{
             .name = "evocation",
+            .description = "Magical incantations and evocations.",
             .commands = &.{ 
                 .{ .name = "fire" },
                 .{ .name = "ice" },
@@ -206,3 +230,30 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
     }
 });
 ```
+
+The `description` on a group is shown beneath the group name in the help output.  Commands can also be assigned to a group directly by setting the `group` field on a `CommandOpt` to the group name (as shown with `transmogrify` above); this is useful when you want to add a single command to an existing group without listing all group commands together.
+
+## Accessing Parse Results
+
+`ArgParserResult` provides several helpers for reading option values:
+
+- `hasOption(name)` — returns `true` if the option was set (including via defaults)
+- `option(name)` — returns a `?*OptionResult`, giving access to `values` and `numOccurences`
+- `optionVal(name)` — returns `?[]const u8` for the first parameter value
+- `optionValOrDefault(name, default)` — like `optionVal` but falls back to `default` if not set
+- `optionNumVal(T, name)` — parses the first parameter value as a numeric type (`u8`–`u64`, `i8`–`i64`, `f32`, `f64`)
+- `optionNumValOrDefault(T, name, default)` — like `optionNumVal` but returns `default` if the option is absent
+
+```zig
+// Check a flag
+if (args.hasOption("verbose")) { ... }
+
+// Read a string value
+const output = args.optionValOrDefault("output", "out.txt");
+
+// Read a numeric value
+const count = try args.optionNumVal(u32, "count");
+const timeout = try args.optionNumValOrDefault(f32, "timeout", 30.0);
+```
+
+Positional arguments (those not associated with any option or command) are available in `args.positional.items` as a `[][]const u8`.

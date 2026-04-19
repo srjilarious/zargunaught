@@ -5,9 +5,9 @@ const zargs = @import("zargunaught");
 const testz = @import("testz");
 
 // ----------------------------------------------------------------------------
-fn simpleCommandConfig() !zargs.ArgParser 
+fn simpleCommandConfig(alloc: std.mem.Allocator) !zargs.ArgParser 
 {
-    return try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple command configuration", 
+    return try zargs.ArgParser.init(alloc, .{ .name = "Simple command configuration", 
         .opts = &.{
             .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
             .{ .longName = "delta", .shortName = "d", .description = "", .maxNumParams = 1 },
@@ -25,14 +25,17 @@ fn simpleCommandConfig() !zargs.ArgParser
 
 // ----------------------------------------------------------------------------
 // Check a command can run with global option.
-pub fn commandWithGlobalOptTest() !void {
-    var parser = try simpleCommandConfig();
+pub fn commandWithGlobalOptTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try simpleCommandConfig(alloc);
     defer parser.deinit();
 
-    const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--beta 123 fire");
-    defer std.heap.page_allocator.free(sysv);
+    const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123 fire");
+    defer alloc.free(sysv);
 
-    const args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv);
+    defer args.deinit();
+    
     try testz.expectEqual(args.options.items.len, 1);
     try testz.expectEqualStr(args.options.items[0].name, "beta");
 
@@ -43,14 +46,16 @@ pub fn commandWithGlobalOptTest() !void {
 
 // ----------------------------------------------------------------------------
 // Check a command can run with a local option.
-pub fn commandWithCommandOptTest() !void {
-    var parser = try simpleCommandConfig();
+pub fn commandWithCommandOptTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try simpleCommandConfig(alloc);
     defer parser.deinit();
-    const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--beta 123 transmogrify -i stone");
-    defer std.heap.page_allocator.free(sysv);
+    const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123 transmogrify -i stone");
+    defer alloc.free(sysv);
 
-    const args = try parser.parseArray(sysv);
-    
+    var args = try parser.parseArray(sysv);
+    defer args.deinit();
+
     try testz.expectTrue(args.command != null);
     try testz.expectEqualStr(args.command.?.name, "transmogrify");
 
@@ -63,8 +68,9 @@ pub fn commandWithCommandOptTest() !void {
 
 // ----------------------------------------------------------------------------
 // Check a command can run with a local option.
-pub fn commandGroupsSimpleTest() !void {
-    var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ 
+pub fn commandGroupsSimpleTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try zargs.ArgParser.init(alloc, .{ 
         .name = "Simple command configuration", 
         .opts = &.{
             .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1 },
@@ -99,11 +105,12 @@ pub fn commandGroupsSimpleTest() !void {
     try testz.expectEqualStr(parser.commands.data.items[3].name, "ice");
     try testz.expectEqualStr(parser.commands.data.items[4].name, "thunder");
 
-    const sysv = try zargs.utils.tokenizeShellString(std.heap.page_allocator, "--beta 123 thunder");
-    defer std.heap.page_allocator.free(sysv);
+    const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123 thunder");
+    defer alloc.free(sysv);
 
-    const args = try parser.parseArray(sysv);
-    
+    var args = try parser.parseArray(sysv);
+    defer args.deinit();
+
     try testz.expectTrue(args.command != null);
     try testz.expectEqualStr(args.command.?.name, "thunder");
 

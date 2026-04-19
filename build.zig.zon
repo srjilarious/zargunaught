@@ -1,16 +1,15 @@
 .{
     .name = .zargunaught,
-    .version = "1.2.0",
+    .version = "1.2.1",
     .fingerprint = 0x8e9d80fe238d876a,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .testz = .{
-            .url = "https://github.com/srjilarious/testz/archive/refs/tags/v1.2.0.tar.gz",
-            .hash = "testz-1.2.0-abaPyUhKCgC26UcPU4iP3zpaVMyNEbihGecCaisssARM",
+            .url = "https://github.com/srjilarious/testz/archive/refs/tags/v1.4.0.tar.gz",
+            .hash = "testz-1.4.0-abaPydnMAQAJayUfCw4dw1MdiaiOS_A_iJGm1qES0bQo",
         },
     },
     .paths = .{
-        //"",
         "build.zig",
         "build.zig.zon",
         "src",

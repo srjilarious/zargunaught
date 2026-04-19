@@ -90,7 +90,9 @@ const ArgQueue = struct {
         const aq: *ArgQueueNode = @fieldParentPtr("node", self.list.first.?);
         _ = self.list.popFirst();
         self.len -= 1;
-        return aq.data;
+        const data = aq.data;
+        self.alloc.destroy(aq);
+        return data;
     }
 
     pub fn isNextItemLikelyAnOption(self: *const Self) bool {
@@ -311,6 +313,7 @@ pub const ArgParser = struct {
             .groupData = std.StringHashMap(*GroupData).init(allocator),
             .alloc = allocator,
         };
+        errdefer argsParser.deinit();
 
         if (opts.name != null) {
             argsParser.name = opts.name.?;
@@ -538,6 +541,7 @@ pub const ArgParser = struct {
         }
 
         var parseResult = ArgParserResult.init(self.alloc);
+        errdefer parseResult.deinit();
 
         // Create a temporary option list to use to find combined global and command level options.
         // Allso used for handling checking for adding in default values at the end.
@@ -655,6 +659,9 @@ pub const ArgParserResult = struct {
     }
 
     pub fn deinit(self: *ArgParserResult) void {
+        for (0..self.options.items.len) |idx| {
+            self.options.items[idx].deinit(self.alloc);
+        }
         self.options.deinit(self.alloc);
         self.positional.deinit(self.alloc);
     }
