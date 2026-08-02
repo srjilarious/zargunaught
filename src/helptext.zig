@@ -126,8 +126,12 @@ pub const HelpFormatter = struct
     }
 
     pub fn deinit(self: *HelpFormatter) void {
-        // TODO: free up each command group.
-        
+        var it = self.commandGroups.valueIterator();
+        while (it.next()) |group| {
+            group.*.deinit(self.alloc);
+            self.alloc.destroy(group.*);
+        }
+
         self.commandGroups.deinit();
     }
 
