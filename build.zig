@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
 fn addExample(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, comptime name: []const u8, root_src_path: []const u8, zargsMod: *std.Build.Module) *std.Build.Step.Compile {
     const exe = b.addExecutable(.{
         .name = name,
-        .root_module = b.addModule("main", .{
+        .root_module = b.createModule(.{
             .root_source_file = b.path(root_src_path),
             .target = target,
             .optimize = optimize,
@@ -31,9 +31,7 @@ fn addExample(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bui
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step(name, "Run " ++ name ++ " example");
     run_step.dependOn(&run_cmd.step);
