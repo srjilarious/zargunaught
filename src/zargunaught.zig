@@ -617,21 +617,21 @@ pub const ArgParser = struct {
         // The rest of the arguments are positional.
         while (parseText.len > 0) {
             const posData = parseText.peekFirst().?;
-            try parseResult.positional.append(parseResult.alloc, posData);
+            try parseResult.positionalArgs.append(parseResult.alloc, posData);
             _ = parseText.popFirst();
         }
 
         // Check for too few or too many positional arguments.
         if (self.parserOpts.minNumPositionalArgs != null) {
             const minPosArgs = self.parserOpts.minNumPositionalArgs.?;
-            if (parseResult.positional.items.len < minPosArgs) {
+            if (parseResult.positionalArgs.items.len < minPosArgs) {
                 return ParseError.TooFewPositionalArguments;
             }
         }
 
         if (self.parserOpts.maxNumPositionalArgs != null) {
             const maxPosArgs = self.parserOpts.maxNumPositionalArgs.?;
-            if (parseResult.positional.items.len > maxPosArgs) {
+            if (parseResult.positionalArgs.items.len > maxPosArgs) {
                 return ParseError.TooManyPositionalArguments;
             }
         }
@@ -646,7 +646,7 @@ pub const ArgParserResult = struct {
     currItemPos: usize,
     options: std.ArrayList(OptionResult),
     command: ?*Command,
-    positional: std.ArrayList([]const u8),
+    positionalArgs: std.ArrayList([]const u8),
 
     pub fn init(allocator: std.mem.Allocator) ArgParserResult {
         return .{
@@ -654,7 +654,7 @@ pub const ArgParserResult = struct {
             .currItemPos = 0,
             .options = .empty,
             .command = null,
-            .positional = .empty,
+            .positionalArgs = .empty,
         };
     }
 
@@ -663,7 +663,7 @@ pub const ArgParserResult = struct {
             self.options.items[idx].deinit(self.alloc);
         }
         self.options.deinit(self.alloc);
-        self.positional.deinit(self.alloc);
+        self.positionalArgs.deinit(self.alloc);
     }
 
     pub fn hasOption(self: *ArgParserResult, name: []const u8) bool {
@@ -706,43 +706,47 @@ pub const ArgParserResult = struct {
         return default;
     }
 
-    pub fn optionNumVal(self: *const ArgParserResult, comptime T: type, optName: []const u8) !T {
-        const optVal = self.optionVal(optName);
-        if (optVal == null) return error.UnknownOption;
-
+    fn parseType(comptime T: type, val: []const u8) !T {
         switch (T) {
             u8, u16, u32, u64 => {
-                return try std.fmt.parseUnsigned(T, optVal.?, 0);
+                return try std.fmt.parseUnsigned(T, val, 0);
             },
             i8, i16, i32, i64 => {
-                return try std.fmt.parseInt(T, optVal.?, 0);
+                return try std.fmt.parseInt(T, val, 0);
             },
             f32, f64 => {
-                return try std.fmt.parseFloat(T, optVal.?);
+                return try std.fmt.parseFloat(T, val);
             },
             else => {
-                return error.UnhandledOptionType;
+                return error.UnhandledType;
             },
         }
     }
 
-    pub fn optionNumValOrDefault(self: *ArgParserResult, comptime T: type, optName: []const u8, default: T) !T {
+    pub fn optionNumVal(self: *const ArgParserResult, comptime T: type, optName: []const u8) !T {
+        const optVal = self.optionVal(optName);
+        if (optVal == null) return error.UnknownOption;
+        return try parseType(T, optVal.?);
+    }
+
+    pub fn optionNumValOrDefault(self: *const ArgParserResult, comptime T: type, optName: []const u8, default: T) !T {
         const optVal = self.optionVal(optName);
         if (optVal == null) return default;
+        return try parseType(T, optVal.?);
+    }
 
-        switch (T) {
-            u8, u16, u32, u64 => {
-                return try std.fmt.parseUnsigned(T, optVal.?, 0);
-            },
-            i8, i16, i32, i64 => {
-                return try std.fmt.parseInt(T, optVal.?, 0);
-            },
-            f32, f64 => {
-                return try std.fmt.parseFloat(T, optVal.?);
-            },
-            else => {
-                return error.UnhandledOptionType;
-            },
-        }
+    pub fn numPositional(self: *const ArgParserResult) usize {
+        return self.positionalArgs.items.len;
+    }
+
+    pub fn positional(self: *const ArgParserResult, idx: u32) ?[]const u8 {
+        if (idx >= self.numPositional()) return null;
+        return self.positionalArgs.items[idx];
+    }
+
+    pub fn positionalVal(self: *const ArgParserResult, comptime T: type, idx: u32) !?T {
+        if (idx >= self.numPositional()) return null;
+        const val = self.positionalArgs.items[idx];
+        return try parseType(T, val);
     }
 };

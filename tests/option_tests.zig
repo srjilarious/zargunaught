@@ -306,6 +306,35 @@ pub fn alllowANoPrefixOnOptions(io: std.Io, alloc: std.mem.Allocator) !void {
     }
 }
 
+pub fn testPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try zargs.ArgParser.init(alloc, .{
+        .name = "Positional args",
+    });
+    defer parser.deinit();
+
+    // Check positional helper methods
+    {
+        const sysv = try zargs.utils.tokenizeShellString(alloc, "alpha beta 12 24");
+        defer alloc.free(sysv);
+
+        var args = try parser.parseArray(sysv);
+        defer args.deinit();
+        try testz.expectEqual(args.numPositional(), 4);
+
+        try testz.expectEqualStr(args.positional(0).?, "alpha");
+        try testz.expectEqualStr(args.positional(1).?, "beta");
+
+        try testz.expectEqualStr(args.positional(2).?, "12");
+        try testz.expectEqual((try args.positionalVal(i32, 2)).?, 12);
+
+        try testz.expectEqualStr(args.positional(3).?, "24");
+        // try testz.expectEqual((try args.positionalVal(u32, 3)).?, 24);
+
+        try testz.expectEqual(args.positional(4), null);
+    }
+}
+
 pub fn testTooFewOrTooManyPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !void {
     _ = io;
     var parser = try zargs.ArgParser.init(alloc, .{
@@ -333,7 +362,7 @@ pub fn testTooFewOrTooManyPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !
 
         var args = try parser.parseArray(sysv);
         defer args.deinit();
-        try testz.expectEqual(args.positional.items.len, 2);
+        try testz.expectEqual(args.numPositional(), 2);
     }
 
     // Check that too many args is an error.
@@ -533,10 +562,10 @@ pub fn testOptionStackingWithLastParams(io: std.Io, alloc: std.mem.Allocator) !v
 
         const deltaResult = args.option("delta");
         try testz.expectEqual(deltaResult.?.values.items.len, 0);
-        try testz.expectEqual(args.positional.items.len, 3);
-        try testz.expectEqualStr(args.positional.items[0], "one");
-        try testz.expectEqualStr(args.positional.items[1], "two");
-        try testz.expectEqualStr(args.positional.items[2], "three");
+        try testz.expectEqual(args.numPositional(), 3);
+        try testz.expectEqualStr(args.positional(0).?, "one");
+        try testz.expectEqualStr(args.positional(1).?, "two");
+        try testz.expectEqualStr(args.positional(2).?, "three");
     }
 }
 
