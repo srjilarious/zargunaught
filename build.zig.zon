@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.17.0-dev.1857+3c46da14d",
     .dependencies = .{
         .testz = .{
-            .url = "https://github.com/srjilarious/testz/archive/refs/tags/v1.5.0.tar.gz",
-            .hash = "testz-1.5.0-abaPyQ7NAQBYXILEqHI3PWLZTK0MNb6yXp0foUmJAdT9",
+            .url = "https://github.com/srjilarious/testz/archive/refs/tags/v1.8.0.tar.gz",
+            .hash = "testz-1.8.0-abaPyRvmAQDGYH65Owy9l-y_H8UX79PYnH9Jpp6TrY_1",
         },
     },
     .paths = .{
