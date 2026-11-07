@@ -124,11 +124,19 @@ if(args.hasOption("help")) {
     var help = try zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme, std.heap.page_allocator);
     defer help.deinit();
 
-    help.printHelpText() catch |err| {
+    help.printHelp(&args) catch |err| {
         std.debug.print("Err: {any}\n", .{err});
     };
 }
 ```
+
+`printHelp` prints the help for whatever was parsed: when a command was given, as in `prog transmogrify --help`, it prints just that command's help (`printCommandHelp`), and otherwise the full help (`printHelpText`).  You can call either of those directly too.
+
+The full help starts with a usage line built from the configuration, like `Usage: prog [options] [command] <input> [output]`, followed by the arguments, the global options, and the commands grouped as configured.  A command's help has its own usage line (`Usage: prog [options] transmogrify [options] [thing]`), its description, its arguments, its options and the global options.
+
+Each option that takes values shows a placeholder after its names: `<value>` when a value is required, `[value]` when it's optional, and `...` when it takes more than one.  Set `valueName` on the option to name it (`.valueName = "file"` gives `--out <file>`).  When the exact number of values isn't clear from the placeholder, or the option has a default, a note follows the description, like `(1 to 3 values)`, `(default: fast)` or `(on by default, --no-color turns it off)`.
+
+The help goes to whichever `Printer` you give the formatter: `Printer.stdout`, `Printer.stderr`, `Printer.toFile` for any open file, or `Printer.memory` to collect it as text.  Colors are used only for a terminal that supports them.  A file printer is flushed when it's deinitialized.
 
 The `banner` field in `ArgParserOpts` lets you override the program name shown at the top of the help output.  If not set, the `name` field is used instead.
 
@@ -158,18 +166,31 @@ This would force the delta option to be provided with one to three parameters by
 
 Values can be given as separate arguments (`--delta a b`), or as one attached value (`--delta=a`, `-da`).  An attached value is the only value for that occurrence.  For short options, text after an option that takes parameters is its value unless it is made up entirely of other short option names, so `-vvb1` sets `v` twice and gives `b` the value `1`.  Only a short option standing alone in its argument takes values from the following arguments.
 
-You can similarly configure the parser to expect a minimum and/or maximum number of positional arguments.  The optional `positionalDescription` field adds a label for positional arguments in the help text:
+You can similarly configure the parser to expect a minimum and/or maximum number of positional arguments:
 
 ```zig
 var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
     .name = "Simple options",
     .minNumPositionalArgs = 1,
     .maxNumPositionalArgs = 2,
-    .positionalDescription = "<input-file> [output-file]",
 });
 ```
 
-Commands can set their own `minNumPositionalArgs` and `maxNumPositionalArgs`, which replace the parser-wide limits while that command is in use.  A limit a command leaves unset falls back to the parser-wide one.
+Positional arguments can also be described by name, which puts them in the help text and its usage line:
+
+```zig
+var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
+    .name = "gw-grep",
+    .positionals = &.{
+        .{ .name = "pattern", .description = "What to search for" },
+        .{ .name = "path", .description = "Where to look", .optional = true, .repeat = true },
+    },
+});
+```
+
+This shows as `Usage: gw-grep <pattern> [path...]`.  Optional arguments must come after the required ones, and only the last may repeat; anything else is an `InvalidPositionals` configuration error.  When `minNumPositionalArgs` and `maxNumPositionalArgs` are left unset, they come from the list: here at least one argument, with no maximum since `path` repeats.
+
+Commands can have their own `positionals`, `minNumPositionalArgs` and `maxNumPositionalArgs`, which replace the parser-wide ones while that command is in use.  A limit a command leaves unset falls back to the parser-wide one, and a command with no positionals of its own shows the parser-wide ones in its help.
 
 You can also provide `defaultPositionalArgs` (`DefaultValue.param` or `.params`) to supply positional arguments when none are given by the user:
 
@@ -255,7 +276,7 @@ The `description` on a group is shown beneath the group name in the help output.
 - `option(name)`: returns a `?*OptionResult`, giving access to `values` and `numOccurences`
 - `optionVal(name)`: returns `?[]const u8` for the first parameter value
 - `optionValOrDefault(name, default)`: like `optionVal` but falls back to `default` if not set
-- `optionNumVal(T, name)`: parses the first parameter value as any integer or float type
+- `optionNumVal(T, name)`: parses the first parameter value as any integer or float type, or returns `error.NoParamGiven` when the option has no value
 - `optionNumValOrDefault(T, name, default)`: like `optionNumVal` but returns `default` if the option is absent
 
 ```zig
@@ -299,4 +320,7 @@ Parse results point into the parser (and, for `parseArray`, into the array passe
 - `CommandList.find` returns `?*Command`, `ArgParser.groupData` holds `GroupData` values, `ArgParserResult.currItemPos` and `ArgParser.parseArgsForOptions` are gone.
 - Duplicate command names now fail with `DuplicateCommandName`, and a command option may not reuse a global option's name.
 - `OptionResult.numOccurences` is a `usize`.
+- `positionalDescription` is replaced by the `positionals` list.
+- `optionNumVal` returns `error.NoParamGiven` instead of `error.UnknownOption` when there's no value.
+- `HelpTheme` has two new styles, `optionValue` and `positionalName`.
 - `utils.tokenizeShellString` returns `ShellTokens` (use `.args`, free with `deinit(alloc)`), so it can join quoted parts like `--name="a b"` into one word; an unclosed quote is `error.UnterminatedQuote`.

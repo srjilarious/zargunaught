@@ -21,7 +21,13 @@ pub const ParserConfigError = error{
     // defaultPositionalArgs must be DefaultValue.param or .params; .set
     // has no meaning for positional arguments.
     InvalidDefaultPositionalArgs,
+    // In a positionals list, an optional argument comes before a required
+    // one, or a repeating argument isn't the last.
+    InvalidPositionals,
 };
+
+/// Returned by optionNumVal when the option wasn't given or has no value.
+pub const ValueError = error{NoParamGiven};
 
 pub const ParseError = error{
     UnknownOption,
@@ -85,7 +91,51 @@ pub const Option = struct {
     // option, so it will also swallow positional arguments after it.
     maxNumParams: ?u8 = 0,
     default: ?DefaultValue = null,
+    // What help text calls this option's values, as in `--out <file>`.
+    valueName: []const u8 = "value",
 };
+
+/// A named positional argument, for help text and usage lines.
+pub const Positional = struct {
+    name: []const u8,
+    description: []const u8 = "",
+    // Optional arguments must come after the required ones.
+    optional: bool = false,
+    // Only the last argument may repeat, e.g. `[path...]`.
+    repeat: bool = false,
+};
+
+fn validatePositionals(positionals: []const Positional) ParserConfigError!void {
+    var seenOptional = false;
+    for (positionals, 0..) |p, i| {
+        if (p.optional) {
+            seenOptional = true;
+        } else if (seenOptional) {
+            return ParserConfigError.InvalidPositionals;
+        }
+
+        if (p.repeat and i != positionals.len - 1) {
+            return ParserConfigError.InvalidPositionals;
+        }
+    }
+}
+
+/// The positional argument count limits a positionals list implies: one
+/// per required argument at least, and no maximum when the last repeats.
+const PositionalLimits = struct { min: ?u8, max: ?u8 };
+
+fn positionalLimits(positionals: []const Positional) PositionalLimits {
+    var required: u8 = 0;
+    for (positionals) |p| {
+        if (!p.optional) required += 1;
+    }
+
+    const repeats = positionals.len > 0 and positionals[positionals.len - 1].repeat;
+    return .{
+        .min = required,
+        .max = if (repeats) null else @intCast(positionals.len),
+    };
+}
 
 pub const OptionResult = struct {
     name: []const u8,
@@ -223,9 +273,12 @@ pub const Command = struct {
     description: ?[]const u8 = null,
     group: ?[]const u8 = null,
     options: OptionList,
+    // The command's own positional arguments, for help text.
+    positionals: []const Positional = &.{},
     // Positional argument limits that replace the parser-wide ones while
     // this command is in use.  Each one left null falls back to the
-    // matching ArgParserOpts limit.
+    // matching ArgParserOpts limit.  When unset, they're worked out from
+    // `positionals` if the command has any.
     minNumPositionalArgs: ?u8 = null,
     maxNumPositionalArgs: ?u8 = null,
 };
@@ -283,6 +336,7 @@ pub const CommandOpt = struct {
     description: ?[]const u8 = null,
     group: ?[]const u8 = null,
     opts: ?[]const Option = null,
+    positionals: []const Positional = &.{},
     minNumPositionalArgs: ?u8 = null,
     maxNumPositionalArgs: ?u8 = null,
 };
@@ -302,7 +356,10 @@ pub const ArgParserOpts = struct {
     banner: ?[]const u8 = null,
     description: ?[]const u8 = null,
     usage: ?[]const u8 = null,
-    positionalDescription: ?[]const u8 = null,
+    // The program's positional arguments, listed in help text and used for
+    // its usage line.  When minNumPositionalArgs and maxNumPositionalArgs
+    // are unset, they're worked out from this list.
+    positionals: []const Positional = &.{},
     minNumPositionalArgs: ?u8 = null,
     maxNumPositionalArgs: ?u8 = null,
     // Used as the positional arguments when the user gives none.
@@ -363,6 +420,13 @@ pub const ArgParser = struct {
             if (default == ._set) return ParserConfigError.InvalidDefaultPositionalArgs;
         }
 
+        try validatePositionals(opts.positionals);
+        if (opts.positionals.len > 0) {
+            const limits = positionalLimits(opts.positionals);
+            if (opts.minNumPositionalArgs == null) argsParser.parserOpts.minNumPositionalArgs = limits.min;
+            if (opts.maxNumPositionalArgs == null) argsParser.parserOpts.maxNumPositionalArgs = limits.max;
+        }
+
         if (opts.commands) |cmds| {
             for (cmds) |cmd| {
                 try argsParser.addCommand(cmd, cmd.group);
@@ -390,10 +454,18 @@ pub const ArgParser = struct {
             .description = cmd.description,
             .group = group,
             .options = OptionList.init(self.alloc),
+            .positionals = cmd.positionals,
             .minNumPositionalArgs = cmd.minNumPositionalArgs,
             .maxNumPositionalArgs = cmd.maxNumPositionalArgs,
         };
         errdefer cmdItem.options.deinit();
+
+        try validatePositionals(cmd.positionals);
+        if (cmd.positionals.len > 0) {
+            const limits = positionalLimits(cmd.positionals);
+            if (cmd.minNumPositionalArgs == null) cmdItem.minNumPositionalArgs = limits.min;
+            if (cmd.maxNumPositionalArgs == null) cmdItem.maxNumPositionalArgs = limits.max;
+        }
 
         if (cmd.opts) |cmdOpts| {
             try cmdItem.options.addOptions(cmdOpts);
@@ -785,7 +857,7 @@ pub const ArgParserResult = struct {
     }
 
     pub fn optionNumVal(self: *const ArgParserResult, comptime T: type, optName: []const u8) !T {
-        const optVal = self.optionVal(optName) orelse return error.UnknownOption;
+        const optVal = self.optionVal(optName) orelse return ValueError.NoParamGiven;
         return try parseType(T, optVal);
     }
 

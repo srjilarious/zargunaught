@@ -405,3 +405,42 @@ pub fn longestShortNameWinsTest(io: std.Io, alloc: std.mem.Allocator) !void {
     try testz.expectEqual(args.option("vexed").?.numOccurences, 2);
     try testz.expectEqual(args.option("verbose").?.numOccurences, 1);
 }
+
+pub fn positionalsSetLimitsTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try zargs.ArgParser.init(alloc, .{
+        .name = "Positionals",
+        .positionals = &.{
+            .{ .name = "pattern" },
+            .{ .name = "path", .optional = true, .repeat = true },
+        },
+        .commands = &.{.{ .name = "pair", .positionals = &.{ .{ .name = "a" }, .{ .name = "b", .optional = true } } }},
+    });
+    defer parser.deinit();
+
+    try testz.expectError(parser.parseArray(&.{}), zargs.ParseError.TooFewPositionalArguments);
+    {
+        var args = try parser.parseArray(&.{ "p", "x", "y", "z" });
+        defer args.deinit();
+        try testz.expectEqual(args.numPositional(), 4);
+    }
+
+    try testz.expectError(parser.parseArray(&.{ "pair", "1", "2", "3" }), zargs.ParseError.TooManyPositionalArguments);
+}
+
+pub fn invalidPositionalsTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    try testz.expectError(zargs.ArgParser.init(alloc, .{ .positionals = &.{ .{ .name = "a", .optional = true }, .{ .name = "b" } } }), zargs.ParserConfigError.InvalidPositionals);
+    try testz.expectError(zargs.ArgParser.init(alloc, .{ .positionals = &.{ .{ .name = "a", .repeat = true }, .{ .name = "b" } } }), zargs.ParserConfigError.InvalidPositionals);
+}
+
+pub fn optionNumValWithoutParamTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try mixedConfig(alloc);
+    defer parser.deinit();
+
+    var args = try parser.parseArray(&.{"--beta"});
+    defer args.deinit();
+    try testz.expectError(args.optionNumVal(u32, "beta"), zargs.ValueError.NoParamGiven);
+    try testz.expectError(args.optionNumVal(u32, "gamma"), zargs.ValueError.NoParamGiven);
+}

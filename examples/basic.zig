@@ -9,13 +9,14 @@ pub fn main(init: std.process.Init) !void {
 
 fn basicOptionParsing(process_args: std.process.Args) !void {
     var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
-        .name = "Test program",
+        .name = "test-program",
+        .banner = "Test program",
         .description = "A cool test program",
         .usage = "Mostly used to transmogrify a thing into a thing.",
         .opts = &.{
             .{ .longName = "alpha", .description = "The first option", .maxNumParams = 0 },
             .{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1, .default = zargs.DefaultValue.param("thing") },
-            .{ .longName = "gamma", .shortName = "g", .description = "The last option here." },
+            .{ .longName = "gamma", .shortName = "g", .description = "The last option here.", .minNumParams = 1, .maxNumParams = 3, .valueName = "word" },
             .{ .longName = "help", .description = "Prints out help for the program." },
         },
         .groups = &.{
@@ -23,8 +24,10 @@ fn basicOptionParsing(process_args: std.process.Args) !void {
                 .name = "Spells",
                 .description = "Magical incantations and evocations.",
                 .commands = &.{
-                    .{ .name = "transmogrify", .opts = &.{
-                        .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .maxNumParams = 1 },
+                    .{ .name = "transmogrify", .description = "Turns a thing into another thing.", .positionals = &.{
+                        .{ .name = "thing", .description = "What to transmogrify.", .optional = true },
+                    }, .opts = &.{
+                        .{ .longName = "into", .shortName = "i", .description = "What you want to transform into. This is super useful if you want to change what you look like or pretend to be someone else for a prank.  Highly recommended!", .minNumParams = 1, .maxNumParams = 1, .valueName = "form" },
                         .{ .longName = "another", .description = "Another option for the command." },
                     } },
                     .{
@@ -72,7 +75,8 @@ fn basicOptionParsing(process_args: std.process.Args) !void {
         var help = try zargs.help.HelpFormatter.init(&parser, stdout, zargs.help.DefaultTheme, std.heap.page_allocator);
         defer help.deinit();
 
-        help.printHelpText() catch |err| {
+        // `transmogrify --help` describes just that command.
+        help.printHelp(&args) catch |err| {
             std.debug.print("Err: {any}\n", .{err});
         };
     } else if (args.command != null) {

@@ -128,6 +128,8 @@ const FilePrinterData = struct {
     }
 
     pub fn deinit(self: *FilePrinterData) void {
+        // So output isn't lost when the caller forgets to flush.
+        self.writer.interface.flush() catch {};
         self.alloc.free(self.buffer);
     }
 };
@@ -144,8 +146,18 @@ pub const Printer = union(enum) {
     _debug: bool,
 
     pub fn stdout(alloc: std.mem.Allocator) !Printer {
+        return toFile(alloc, std.Io.File.stdout());
+    }
+
+    pub fn stderr(alloc: std.mem.Allocator) !Printer {
+        return toFile(alloc, std.Io.File.stderr());
+    }
+
+    /// Prints to `file`, in color when it's a terminal that supports it.
+    /// Call flush (or deinit) to write out what's buffered.
+    pub fn toFile(alloc: std.mem.Allocator, file: std.Io.File) !Printer {
         const f = try alloc.create(FilePrinterData);
-        f.* = FilePrinterData.init(alloc, std.Io.File.stdout()) catch {
+        f.* = FilePrinterData.init(alloc, file) catch {
             alloc.destroy(f);
             return error.OutOfMemory;
         };
