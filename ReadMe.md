@@ -2,7 +2,7 @@
 
 ![Logo](images/zargunaught.png)
 
-![Version Badge](https://img.shields.io/badge/Version-1.5.0-brightgreen)
+![Version Badge](https://img.shields.io/badge/Version-2.0.0-brightgreen)
 ![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.17.0--dev.1857%2B3c46da14d-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -13,6 +13,8 @@ It doesn't try to map your options into a structure or use meta programming tric
 # Features
 
 - Global options, with long and short names.
+- Options can go anywhere on the command line, before or after positional arguments.
+- Values attached with `--name=value` or `-nvalue`, as well as `--name value`.
 - Min/max number of parameters and positional arguments.
 - Support for commands with extended options per command.
 - Options stacking, like `-vvv` to mark `v` as having occurred 3 times, with options for max allowed (or no stacking).
@@ -21,6 +23,8 @@ It doesn't try to map your options into a structure or use meta programming tric
 - Help text formatter with word-wrapping and basic color theming support.
 - Grouping of commands for better formatted help text.
 - `--` to stop option parsing and consider the rest of the command line as positional arguments.
+- A lone `-` (the usual way to say stdin) and negative numbers like `-5` are positional arguments.
+- `failedArg` on the parser names the argument behind a parse error.
 
 # installing
 
@@ -71,7 +75,7 @@ var parser = try zargs.ArgParser.init(
                 .longName = "gamma",
                 .shortName = "g",
                 .description = "the last option here.",
-                .maxNumParams = -1,
+                .maxNumParams = null,
             },
         },
         .commands = &.{
@@ -94,7 +98,7 @@ var parser = try zargs.ArgParser.init(
 defer parser.deinit();
 
 var args = parser.parse(init.minimal.args) catch |err| {
-    std.debug.print("error parsing args: {any}\n", .{err});
+    std.debug.print("error parsing args: {any} {s}\n", .{ err, parser.failedArg orelse "" });
     return;
 };
 defer args.deinit();
@@ -138,7 +142,11 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
 
 ## Min/Max Parameters and Positional Arguments
 
-By default there are no minimum or maximum number of parameters for each option, which means a user is able to provide as many, or no parameters to an option.  If you want the parser to throw an error depending on the number of parameters to an option:
+By default an option is a plain flag: `maxNumParams` is 0, so it takes no parameters.  Set `maxNumParams` to let it take values, or to `null` for no limit.  An option without a limit takes every following argument up to the next option or `--`, so it will also swallow positional arguments placed after it.
+
+Setting `minNumParams` above `maxNumParams`, or a `default` with more values than `maxNumParams` allows, is a configuration error (`MinParamsExceedMax`, `DefaultParamsExceedMax`), which catches an option that wants values but forgot to set `maxNumParams`.
+
+If you want the parser to throw an error depending on the number of parameters to an option:
 
 ```zig
 var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simple options", .opts = &.{
@@ -146,7 +154,9 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Simpl
 } });
 ```
 
-This would force the delta option to be provided with one to three parameters by the user.
+This would force the delta option to be provided with one to three parameters by the user.  The minimum is checked for each occurrence of the option.
+
+Values can be given as separate arguments (`--delta a b`), or as one attached value (`--delta=a`, `-da`).  An attached value is the only value for that occurrence.  For short options, text after an option that takes parameters is its value unless it is made up entirely of other short option names, so `-vvb1` sets `v` twice and gives `b` the value `1`.  Only a short option standing alone in its argument takes values from the following arguments.
 
 You can similarly configure the parser to expect a minimum and/or maximum number of positional arguments.  The optional `positionalDescription` field adds a label for positional arguments in the help text:
 
@@ -159,7 +169,9 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
 });
 ```
 
-You can also provide `defaultPositionalArgs` to supply positional arguments when none are given by the user:
+Commands can set their own `minNumPositionalArgs` and `maxNumPositionalArgs`, which replace the parser-wide limits while that command is in use.  A limit a command leaves unset falls back to the parser-wide one.
+
+You can also provide `defaultPositionalArgs` (`DefaultValue.param` or `.params`) to supply positional arguments when none are given by the user:
 
 ```zig
 var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
@@ -180,7 +192,9 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{ .name = "Defau
 } });
 ```
 
-Here `beta` will be set, but no have any parameters associated with it.  A user could use `--no-beta` to unset it during argument parsing.
+Here `beta` will be set, but no have any parameters associated with it.  A user could use `--no-beta` to unset it during argument parsing.  When both `--beta` and `--no-beta` are given, the last one wins.  An option whose own name starts with `no-` is matched by that name first.
+
+An option with a default value needs `maxNumParams` at least as large as the number of default values, as `gamma` and `delta` would in practice.
 
 The `gamma` option will by default be set with a single `blah` parameter, and `delta` will be set with the three values `boop`, `blop` and `bleep`.
 
@@ -237,12 +251,12 @@ The `description` on a group is shown beneath the group name in the help output.
 
 `ArgParserResult` provides several helpers for reading option values:
 
-- `hasOption(name)` — returns `true` if the option was set (including via defaults)
-- `option(name)` — returns a `?*OptionResult`, giving access to `values` and `numOccurences`
-- `optionVal(name)` — returns `?[]const u8` for the first parameter value
-- `optionValOrDefault(name, default)` — like `optionVal` but falls back to `default` if not set
-- `optionNumVal(T, name)` — parses the first parameter value as a numeric type (`u8`–`u64`, `i8`–`i64`, `f32`, `f64`)
-- `optionNumValOrDefault(T, name, default)` — like `optionNumVal` but returns `default` if the option is absent
+- `hasOption(name)`: returns `true` if the option was set (including via defaults)
+- `option(name)`: returns a `?*OptionResult`, giving access to `values` and `numOccurences`
+- `optionVal(name)`: returns `?[]const u8` for the first parameter value
+- `optionValOrDefault(name, default)`: like `optionVal` but falls back to `default` if not set
+- `optionNumVal(T, name)`: parses the first parameter value as any integer or float type
+- `optionNumValOrDefault(T, name, default)`: like `optionNumVal` but returns `default` if the option is absent
 
 ```zig
 // Check a flag
@@ -256,4 +270,33 @@ const count = try args.optionNumVal(u32, "count");
 const timeout = try args.optionNumValOrDefault(f32, "timeout", 30.0);
 ```
 
-Positional arguments (those not associated with any option or command) are available in `args.positional.items` as a `[][]const u8`.
+Positional arguments (those not associated with any option or command) are read with:
+
+- `numPositional()`: how many there are
+- `positionals()`: all of them, as a `[]const []const u8`
+- `positional(idx)`: the one at `idx`, or `null`
+- `positionalVal(T, idx)`: the one at `idx` parsed as a number, or `null`
+
+## Option Placement and Commands
+
+Options may appear anywhere: `prog file -v` and `prog -v file` mean the same thing.  `--` ends option parsing, and everything after it is positional.
+
+The first argument that isn't an option is the command, if it names one.  Global options can be used anywhere; a command's own options are recognized after its name.  Once a positional argument has been seen, a later argument that matches a command name is just another positional argument.
+
+Wrapper style programs, where everything from the first positional argument on belongs to something else (`prog run cmd -x`), can set `stopAtFirstPositional = true` in `ArgParserOpts` to treat the rest of the command line as positional.
+
+## Errors
+
+Parse errors come from `zargs.ParseError`, and configuration errors from `zargs.ParserConfigError`.  After a parse error, `parser.failedArg` holds the argument that caused it, or `null` for too few or too many positional arguments.
+
+Parse results point into the parser (and, for `parseArray`, into the array passed in), so they must not outlive it.
+
+# Migrating from 1.x
+
+- `maxNumParams` now defaults to 0 instead of no limit.  Options that take values need `maxNumParams` set; use `null` for the old unlimited behavior.
+- Options may now follow positional arguments.  Set `stopAtFirstPositional` to keep the old behavior.
+- `positional` on the result became `positionalArgs`; read it through `positionals()` and the other helpers.
+- `CommandList.find` returns `?*Command`, `ArgParser.groupData` holds `GroupData` values, `ArgParserResult.currItemPos` and `ArgParser.parseArgsForOptions` are gone.
+- Duplicate command names now fail with `DuplicateCommandName`, and a command option may not reuse a global option's name.
+- `OptionResult.numOccurences` is a `usize`.
+- `utils.tokenizeShellString` returns `ShellTokens` (use `.args`, free with `deinit(alloc)`), so it can join quoted parts like `--name="a b"` into one word; an unclosed quote is `error.UnterminatedQuote`.

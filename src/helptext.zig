@@ -9,6 +9,13 @@ const ArgParser = zargs.ArgParser;
 const Option = zargs.Option;
 const Command = zargs.Command;
 
+// Lines are wrapped to this width.
+const maxLineLength = 80;
+
+// Command options sit this much further in than global options and commands.
+const commandOptionIndent = 2;
+
+/// The printed width of an option's names, e.g. `--name, -n`.
 fn optionHelpNameLength(opt: *const Option) usize {
     // + 2 for the dashes
     var optLen = opt.longName.len + 2;
@@ -20,6 +27,8 @@ fn optionHelpNameLength(opt: *const Option) usize {
     return optLen;
 }
 
+/// The widest option or command name, counting a command option's extra
+/// indent, so every description can start in the same column.
 pub fn findMaxOptComLength(argsConf: *const ArgParser) usize
 {
     var currMax: usize = 0;
@@ -35,8 +44,7 @@ pub fn findMaxOptComLength(argsConf: *const ArgParser) usize
 
         // Check the command options as well
         for(com.options.data.items) |opt| {
-            // Account for extra 2 indentation for command options.
-            currMax = @max(optionHelpNameLength(&opt) + 2, currMax);
+            currMax = @max(optionHelpNameLength(&opt) + commandOptionIndent, currMax);
         }
     }
 
@@ -78,7 +86,7 @@ pub const DefaultTheme: HelpTheme = .{
     .description = .{ .fg = .Reset, .bg = . Reset, .mod = .{} },
 };
 
-pub const HelpFormatter = struct 
+pub const HelpFormatter = struct
 {
     currLineLen: usize = 0,
     currIndentLevel: usize = 0,
@@ -88,41 +96,44 @@ pub const HelpFormatter = struct
     alloc: std.mem.Allocator,
     commandGroups: std.StringHashMap(*CommandGroup),
 
-    // A buffer used while printing so we can do word wrapping
-    // properly.
-    //buffer: [2048]u8,
+    // Group names in the order their first command was defined, so the
+    // help text follows the configuration instead of hash map order.
+    groupOrder: std.ArrayList([]const u8),
 
-    pub fn init(args: *const ArgParser, printer: Printer, theme: HelpTheme, alloc: std.mem.Allocator) !HelpFormatter 
+    pub fn init(args: *const ArgParser, printer: Printer, theme: HelpTheme, alloc: std.mem.Allocator) !HelpFormatter
     {
-        var groups = std.StringHashMap(*CommandGroup).init(alloc);
-        for(0..args.commands.data.items.len) |idx| {
-            const cmd: *Command = &args.commands.data.items[idx];
-            var groupName: []const u8 = "";
-            if(cmd.group != null) {
-                groupName = cmd.group.?;
-            }
-
-            if(!groups.contains(groupName)) {
-                var group = try alloc.create(CommandGroup);
-                group.* = .empty;
-
-                try group.append(alloc, cmd);
-                try groups.put(groupName, group);
-            } else {
-                var group = groups.get(groupName).?;
-                try group.append(alloc, cmd);
-            }
-        }
-
-        return .{
+        var formatter: HelpFormatter = .{
             .currLineLen = 0,
             .currIndentLevel = 0,
             .args = args,
             .printer = printer,
             .theme = theme,
             .alloc = alloc,
-            .commandGroups = groups,
+            .commandGroups = std.StringHashMap(*CommandGroup).init(alloc),
+            .groupOrder = .empty,
         };
+        errdefer formatter.deinit();
+
+        for(0..args.commands.data.items.len) |idx| {
+            const cmd: *Command = &args.commands.data.items[idx];
+            const groupName: []const u8 = cmd.group orelse "";
+
+            if(formatter.commandGroups.get(groupName)) |group| {
+                try group.append(alloc, cmd);
+                continue;
+            }
+
+            const group = try alloc.create(CommandGroup);
+            group.* = .empty;
+            formatter.commandGroups.put(groupName, group) catch |err| {
+                alloc.destroy(group);
+                return err;
+            };
+            try group.append(alloc, cmd);
+            try formatter.groupOrder.append(alloc, groupName);
+        }
+
+        return formatter;
     }
 
     pub fn deinit(self: *HelpFormatter) void {
@@ -133,6 +144,25 @@ pub const HelpFormatter = struct
         }
 
         self.commandGroups.deinit();
+        self.groupOrder.deinit(self.alloc);
+    }
+
+    // The column the ': ' before each description starts in.
+    fn separatorColumn(maxOptComLen: usize) usize {
+        return 2 + maxOptComLen + 1;
+    }
+
+    /// Pads from `currCol` to the separator column, then prints the
+    /// separator and the word-wrapped description.
+    fn printDescription(self: *HelpFormatter, description: []const u8, currCol: usize, maxOptComLen: usize) !void {
+        const sepCol = separatorColumn(maxOptComLen);
+        try self.theme.separator.set(self.printer);
+        try self.printer.printNum(" ", sepCol - currCol);
+        try self.printer.print(": ", .{});
+
+        try self.theme.description.set(self.printer);
+        const descCol = sepCol + 2;
+        _ = try self.printer.printWrapped(description, descCol, descCol, maxLineLength);
     }
 
     fn printCommandGroup(self: *HelpFormatter, groupName: []const u8, group: *const CommandGroup, maxOptComLen: usize) !void {
@@ -148,13 +178,11 @@ pub const HelpFormatter = struct
         try Style.reset(self.printer);
 
         // Print the group description if one exists.
-
-        if(self.args.groupData.contains(groupName)) {
-            const groupData = self.args.groupData.getPtr(groupName).?;
-            if(groupData.*.description != null) {
+        if(self.args.groupData.get(groupName)) |groupData| {
+            if(groupData.description) |description| {
                 try self.newLine();
                 try self.theme.groupDescription.set(self.printer);
-                try self.printer.print("  {s}", .{groupData.*.description.?});
+                try self.printer.print("  {s}", .{description});
                 try self.newLine();
                 try Style.reset(self.printer);
             }
@@ -169,16 +197,9 @@ pub const HelpFormatter = struct
             try self.theme.commandName.set(self.printer);
             try self.printer.print("  {s}", .{com.name});
 
-
             // Print out the command description if there is one.
-            if(com.description != null) {
-                try self.theme.separator.set(self.printer);
-                // Account for command not having dashes.
-                try self.printer.printNum(" ", maxOptComLen - com.name.len + 2);
-                try self.printer.print(": ", .{});
-
-               try self.theme.description.set(self.printer);
-                try self.printer.print("{?s}", .{com.description});
+            if(com.description) |description| {
+                try self.printDescription(description, 2 + com.name.len, maxOptComLen);
             }
 
             if(com.options.data.items.len > 0) {
@@ -188,26 +209,12 @@ pub const HelpFormatter = struct
             // Check the command options as well
             for(com.options.data.items) |opt| {
                 try Style.reset(self.printer);
-                try self.printer.print("    ", .{});
+                try self.printer.printNum(" ", 2 + commandOptionIndent);
 
                 try self.theme.optionName.set(self.printer);
                 const optLen = try self.optionHelpName(&opt);
 
-                try self.theme.separator.set(self.printer);
-
-                // Account for extra 2 indentation for command option.
-                try self.printer.printNum(" ", maxOptComLen - optLen - 2);
-                try self.printer.print(": ", .{});
-
-
-                try self.theme.description.set(self.printer);
-                // try self.printer.print("{s}", .{opt.description});
-                _ = try self.printer.printWrapped(
-                        opt.description,
-                        maxOptComLen + 2 + 4,
-                        maxOptComLen + 2 + 4,
-                        80
-                    );
+                try self.printDescription(opt.description, 2 + commandOptionIndent + optLen, maxOptComLen);
                 try self.newLine();
             }
         }
@@ -221,28 +228,42 @@ pub const HelpFormatter = struct
 
         try self.newLine();
         try self.theme.banner.set(self.printer);
-        if(self.args.parserOpts.banner != null) {
-            try self.printer.print("{?s}", .{self.args.parserOpts.banner});
+        if(self.args.parserOpts.banner) |banner| {
+            try self.printer.print("{s}", .{banner});
         }
         else {
             try self.printer.print("{s}", .{self.args.name});
         }
 
-        if(self.args.parserOpts.description != null) {
+        if(self.args.parserOpts.description) |description| {
             try self.theme.separator.set(self.printer);
             try self.printer.print(" - ", .{});
 
             try self.theme.progDescription.set(self.printer);
-            try self.printer.print("{?s}", .{self.args.parserOpts.description});
+            try self.printer.print("{s}", .{description});
             try self.newLine();
         }
 
         try self.newLine();
 
-        if(self.args.parserOpts.usage != null) {
+        if(self.args.parserOpts.usage) |usage| {
             try self.theme.usage.set(self.printer);
-            try self.printer.print("{?s}", .{self.args.parserOpts.usage});
-            
+            try self.printer.print("{s}", .{usage});
+
+            try self.newLine();
+            try self.newLine();
+        }
+
+        if(self.args.parserOpts.positionalDescription) |positionalDescription| {
+            try self.theme.groupName.set(self.printer);
+            try self.printer.print("Arguments", .{});
+            try Style.reset(self.printer);
+            try self.newLine();
+
+            try self.theme.description.set(self.printer);
+            try self.printer.print("  ", .{});
+            _ = try self.printer.printWrapped(positionalDescription, 2, 2, maxLineLength);
+            try Style.reset(self.printer);
             try self.newLine();
             try self.newLine();
         }
@@ -261,71 +282,42 @@ pub const HelpFormatter = struct
                 try self.theme.optionName.set(self.printer);
                 const optLen = try self.optionHelpName(&opt);
 
-                try self.theme.separator.set(self.printer);
-                try self.printer.printNum(" ", maxOptComLen - optLen);
-                try self.printer.print(": ", .{});
-
-                try self.theme.description.set(self.printer);
-                try self.printer.print("{s}", .{opt.description});
+                try self.printDescription(opt.description, 2 + optLen, maxOptComLen);
                 try self.newLine();
             }
 
             try self.newLine();
         }
 
-        var groupIterator = self.commandGroups.keyIterator();
-        while(true) {
-            const groupNamePtr = groupIterator.next();
-            if(groupNamePtr == null) break;
-
-            const groupName = groupNamePtr.?.*;
+        for(self.groupOrder.items) |groupName| {
             const group = self.commandGroups.get(groupName).?;
             try self.printCommandGroup(groupName, group, maxOptComLen);
             try self.newLine();
         }
 
-        // var groupDataIterator = self.args.groupData.keyIterator();
-        // while(true) {
-        //     const groupNamePtr = groupDataIterator.next();
-        //     if(groupNamePtr == null) break;
-        //
-        //     const groupData = self.args.groupData.getPtr(groupNamePtr.?.*).?;
-        //     std.debug.print("Group {s} - {?s}\n", .{groupNamePtr.?.*, groupData.*.description});
-        // }
+        try Style.reset(self.printer);
     }
 
-    // fn indent(level: usize) void
-    // {
-    //
-    // }
-
+    /// Prints `--name, -n` and returns its width.
     fn optionHelpName(self: *HelpFormatter, opt: *const Option) !usize
     {
-        var amount: usize = 0;
         try self.theme.optionDash.set(self.printer);
         try self.optionDash(.Long);
         try self.theme.optionName.set(self.printer);
         try self.printer.print("{s}", .{opt.longName});
-        amount += opt.longName.len + 1;
 
         if(opt.shortName.len > 0) {
             try self.theme.optionSeparator.set(self.printer);
             try self.printer.print(", ", .{});
-        
+
             try self.theme.optionDash.set(self.printer);
             try self.optionDash(.Short);
             try self.theme.optionName.set(self.printer);
             try self.printer.print("{s}", .{opt.shortName});
-            amount += opt.shortName.len + 3;
         }
 
-        return amount;
+        return optionHelpNameLength(opt);
     }
-
-    // fn optionHelpNameLength(self: *HelpFormatter) usize
-    // {
-    //
-    // }
 
     fn optionDash(self: *HelpFormatter, longDash: DashType) !void
     {
@@ -340,11 +332,4 @@ pub const HelpFormatter = struct
         try self.printer.print("\n", .{});
         self.currLineLen = 0;
     }
-
-    // fn optionHelpName(self: *HelpFormatter) void
-    // {
-    //
-    // }
-
-
 };

@@ -59,7 +59,8 @@ fn basicOptionParsing(process_args: std.process.Args) !void {
     defer parser.deinit();
 
     var args = parser.parse(process_args) catch |err| {
-        std.debug.print("Error parsing args: {any}\n", .{err});
+        // failedArg names the argument at fault, when there is one.
+        std.debug.print("Error parsing args: {any} {s}\n", .{ err, parser.failedArg orelse "" });
         return;
     };
     defer args.deinit();

@@ -81,9 +81,9 @@ pub fn simpleLongOptionParseTest(io: std.Io, alloc: std.mem.Allocator) !void {
     defer parser.deinit();
 
     const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
     try testz.expectEqual(args.options.items.len, 1);
     const opt = args.options.items[0];
@@ -103,9 +103,9 @@ pub fn simpleShortOptionParseTest(io: std.Io, alloc: std.mem.Allocator) !void {
     // Test first short option
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-b 123");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = parser.parseArray(sysv) catch |err| {
+        var args = parser.parseArray(sysv.args) catch |err| {
             try testz.failWith(err);
             return;
         };
@@ -121,9 +121,9 @@ pub fn simpleShortOptionParseTest(io: std.Io, alloc: std.mem.Allocator) !void {
     // Test second short option
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-d 234");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = parser.parseArray(sysv) catch |err| {
+        var args = parser.parseArray(sysv.args) catch |err| {
             try testz.failWith(err);
             return;
         };
@@ -141,16 +141,16 @@ pub fn simpleShortOptionParseTest(io: std.Io, alloc: std.mem.Allocator) !void {
 pub fn testMinParams(io: std.Io, alloc: std.mem.Allocator) !void {
     _ = io;
     var parser = try zargs.ArgParser.init(alloc, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "delta", .shortName = "d", .description = "", .minNumParams = 1, .default = zargs.DefaultValue.param("boop") },
+        .{ .longName = "delta", .shortName = "d", .description = "", .minNumParams = 1, .maxNumParams = 1, .default = zargs.DefaultValue.param("boop") },
     } });
     defer parser.deinit();
 
     // Test with too few params for delta
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--delta");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        if (parser.parseArray(sysv)) |_| {
+        if (parser.parseArray(sysv.args)) |_| {
             try testz.failWith("Expected a parsing error!");
         } else |err| {
             try testz.expectEqual(zargs.ParseError.TooFewOptionParams, err);
@@ -160,9 +160,9 @@ pub fn testMinParams(io: std.Io, alloc: std.mem.Allocator) !void {
     // Test that with min params satisfied that things work.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--delta bop!");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
 
@@ -175,9 +175,9 @@ pub fn testMinParams(io: std.Io, alloc: std.mem.Allocator) !void {
     // Test that a default option is ok.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
 
@@ -191,15 +191,15 @@ pub fn testMinParams(io: std.Io, alloc: std.mem.Allocator) !void {
 pub fn checkDefaultValues(io: std.Io, alloc: std.mem.Allocator) !void {
     _ = io;
     var parser = try zargs.ArgParser.init(alloc, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "beta", .shortName = "b", .description = "", .default = zargs.DefaultValue.param("blah") },
-        .{ .longName = "delta", .shortName = "d", .description = "", .default = zargs.DefaultValue.param("boop") },
+        .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 1, .default = zargs.DefaultValue.param("blah") },
+        .{ .longName = "delta", .shortName = "d", .description = "", .maxNumParams = 1, .default = zargs.DefaultValue.param("boop") },
     } });
     defer parser.deinit();
 
     const sysv = try zargs.utils.tokenizeShellString(alloc, "");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
     try testz.expectEqual(args.options.items.len, 2);
 
@@ -217,15 +217,15 @@ pub fn checkDefaultValues(io: std.Io, alloc: std.mem.Allocator) !void {
 pub fn checkDefaultMultipleValues(io: std.Io, alloc: std.mem.Allocator) !void {
     _ = io;
     var parser = try zargs.ArgParser.init(alloc, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "beta", .shortName = "b", .description = "", .default = zargs.DefaultValue.params(&.{ "blah", "foo" }) },
-        .{ .longName = "delta", .shortName = "d", .description = "", .default = zargs.DefaultValue.params(&.{ "boop", "blop", "bleep" }) },
+        .{ .longName = "beta", .shortName = "b", .description = "", .maxNumParams = 2, .default = zargs.DefaultValue.params(&.{ "blah", "foo" }) },
+        .{ .longName = "delta", .shortName = "d", .description = "", .maxNumParams = null, .default = zargs.DefaultValue.params(&.{ "boop", "blop", "bleep" }) },
     } });
     defer parser.deinit();
 
     const sysv = try zargs.utils.tokenizeShellString(alloc, "");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
     try testz.expectEqual(args.options.items.len, 2);
 
@@ -252,9 +252,9 @@ pub fn checkDefaultOptionsWithoutParams(io: std.Io, alloc: std.mem.Allocator) !v
     defer parser.deinit();
 
     const sysv = try zargs.utils.tokenizeShellString(alloc, "");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
     try testz.expectEqual(args.options.items.len, 1);
 
@@ -274,9 +274,9 @@ pub fn alllowANoPrefixOnOptions(io: std.Io, alloc: std.mem.Allocator) !void {
     // By default we should set both of our options above.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 2);
     }
@@ -284,9 +284,9 @@ pub fn alllowANoPrefixOnOptions(io: std.Io, alloc: std.mem.Allocator) !void {
     // Turn off both options with a `no-` prefix.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--no-beta --no-delta");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 0);
     }
@@ -294,9 +294,9 @@ pub fn alllowANoPrefixOnOptions(io: std.Io, alloc: std.mem.Allocator) !void {
     // Check again but with just one option turned off.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--no-beta");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
 
@@ -316,9 +316,9 @@ pub fn testPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !void {
     // Check positional helper methods
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "alpha beta 12 24");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.numPositional(), 4);
 
@@ -347,9 +347,9 @@ pub fn testTooFewOrTooManyPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !
     // Check that too few args is an error.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        const args = parser.parseArray(sysv);
+        const args = parser.parseArray(sysv.args);
         if (args != zargs.ParseError.TooFewPositionalArguments) {
             try testz.failWith("Expected a too few positional args error!");
         }
@@ -358,9 +358,9 @@ pub fn testTooFewOrTooManyPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !
     // Check that enough args is not an error.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "one two");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.numPositional(), 2);
     }
@@ -368,9 +368,9 @@ pub fn testTooFewOrTooManyPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !
     // Check that too many args is an error.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "one two three");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        const args = parser.parseArray(sysv);
+        const args = parser.parseArray(sysv.args);
         if (args != zargs.ParseError.TooManyPositionalArguments) {
             try testz.failWith("Expected a too many positional args error!");
         }
@@ -380,7 +380,7 @@ pub fn testTooFewOrTooManyPositionalArgs(io: std.Io, alloc: std.mem.Allocator) !
 pub fn testMultipleOptionInstanceParams(io: std.Io, alloc: std.mem.Allocator) !void {
     _ = io;
     var parser = try zargs.ArgParser.init(alloc, .{ .name = "Simple options", .opts = &.{
-        .{ .longName = "file", .shortName = "f", .description = "files", .maxOccurences = 4 },
+        .{ .longName = "file", .shortName = "f", .description = "files", .maxOccurences = 4, .maxNumParams = 1 },
         .{ .longName = "delta", .shortName = "d", .description = "", .maxOccurences = 2 },
     } });
     defer parser.deinit();
@@ -388,9 +388,9 @@ pub fn testMultipleOptionInstanceParams(io: std.Io, alloc: std.mem.Allocator) !v
     // We expect multiple occurences to add to the existing list of parameters in an option result.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--file one --file two --file three");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("file");
@@ -404,9 +404,9 @@ pub fn testMultipleOptionInstanceParams(io: std.Io, alloc: std.mem.Allocator) !v
     // Mixing short and long names should be the same.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--file one -f two -f three");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("file");
@@ -420,9 +420,9 @@ pub fn testMultipleOptionInstanceParams(io: std.Io, alloc: std.mem.Allocator) !v
     // Mixing other options in the middle should also be fine.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "--file one -d -f two -d -f three");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 2);
         const optResult = args.option("file");
@@ -445,9 +445,9 @@ pub fn testOptionStacking(io: std.Io, alloc: std.mem.Allocator) !void {
     // Check that we can still use a single occurence of a stacked option.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-v");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("verbose");
@@ -457,9 +457,9 @@ pub fn testOptionStacking(io: std.Io, alloc: std.mem.Allocator) !void {
     // Check that we can see multiple occurences of stacked option.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-vvvv");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("verbose");
@@ -469,9 +469,9 @@ pub fn testOptionStacking(io: std.Io, alloc: std.mem.Allocator) !void {
     // Check that we can see max occurences of stacked option.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-vvvvv");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 1);
         const optResult = args.option("verbose");
@@ -481,9 +481,9 @@ pub fn testOptionStacking(io: std.Io, alloc: std.mem.Allocator) !void {
     // Check that we can see an error over max occurences of stacked option.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-vvvvvv");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        const args = parser.parseArray(sysv);
+        const args = parser.parseArray(sysv.args);
         try testz.expectError(args, error.TooManyOptionOccurences);
     }
 }
@@ -515,9 +515,9 @@ pub fn testOptionStackingWithLastParams(io: std.Io, alloc: std.mem.Allocator) !v
     // Check that we can see multiple occurences of stacked option and another option as well.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-dvvv");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 2);
         const optResult = args.option("verbose");
@@ -530,9 +530,9 @@ pub fn testOptionStackingWithLastParams(io: std.Io, alloc: std.mem.Allocator) !v
     // Check that we can see multiple occurences of stacked option and another option as well.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-dgvv");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 3);
         const optResult = args.option("verbose");
@@ -549,9 +549,9 @@ pub fn testOptionStackingWithLastParams(io: std.Io, alloc: std.mem.Allocator) !v
     // as positional.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-vvgvvd one two three");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
         try testz.expectEqual(args.options.items.len, 3);
         const optResult = args.option("verbose");
@@ -597,9 +597,9 @@ pub fn testOptionStackingWithOptionsWithoutShortName(io: std.Io, alloc: std.mem.
     // the option stacking would never end until overflowing the number of occurences.
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-v");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
 
         try testz.expectEqual(args.options.items.len, 1);
@@ -609,9 +609,9 @@ pub fn testOptionStackingWithOptionsWithoutShortName(io: std.Io, alloc: std.mem.
 
     {
         const sysv = try zargs.utils.tokenizeShellString(alloc, "-vvv --delta");
-        defer alloc.free(sysv);
+        defer sysv.deinit(alloc);
 
-        var args = try parser.parseArray(sysv);
+        var args = try parser.parseArray(sysv.args);
         defer args.deinit();
 
         try testz.expectEqual(args.options.items.len, 2);

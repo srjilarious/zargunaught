@@ -31,9 +31,9 @@ pub fn commandWithGlobalOptTest(io: std.Io, alloc: std.mem.Allocator) !void {
     defer parser.deinit();
 
     const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123 fire");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
     
     try testz.expectEqual(args.options.items.len, 1);
@@ -51,9 +51,9 @@ pub fn commandWithCommandOptTest(io: std.Io, alloc: std.mem.Allocator) !void {
     var parser = try simpleCommandConfig(alloc);
     defer parser.deinit();
     const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123 transmogrify -i stone");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
 
     try testz.expectTrue(args.command != null);
@@ -106,9 +106,9 @@ pub fn commandGroupsSimpleTest(io: std.Io, alloc: std.mem.Allocator) !void {
     try testz.expectEqualStr(parser.commands.data.items[4].name, "thunder");
 
     const sysv = try zargs.utils.tokenizeShellString(alloc, "--beta 123 thunder");
-    defer alloc.free(sysv);
+    defer sysv.deinit(alloc);
 
-    var args = try parser.parseArray(sysv);
+    var args = try parser.parseArray(sysv.args);
     defer args.deinit();
 
     try testz.expectTrue(args.command != null);
