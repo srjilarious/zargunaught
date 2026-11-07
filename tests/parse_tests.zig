@@ -444,3 +444,33 @@ pub fn optionNumValWithoutParamTest(io: std.Io, alloc: std.mem.Allocator) !void 
     try testz.expectError(args.optionNumVal(u32, "beta"), zargs.ValueError.NoParamGiven);
     try testz.expectError(args.optionNumVal(u32, "gamma"), zargs.ValueError.NoParamGiven);
 }
+
+pub fn skipsPositionalChecksTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try zargs.ArgParser.init(alloc, .{
+        .name = "Skips",
+        .positionals = &.{.{ .name = "image" }},
+        .opts = &.{
+            .{ .longName = "help", .shortName = "h", .skipsPositionalChecks = true },
+            .{ .longName = "quiet", .default = zargs.DefaultValue.set(), .skipsPositionalChecks = true },
+            .{ .longName = "verbose", .shortName = "v" },
+        },
+    });
+    defer parser.deinit();
+
+    // Neither too few nor too many arguments stop --help.
+    {
+        var args = try parser.parseArray(&.{"--help"});
+        defer args.deinit();
+        try testz.expectTrue(args.hasOption("help"));
+    }
+    {
+        var args = try parser.parseArray(&.{ "a", "b", "-h" });
+        defer args.deinit();
+        try testz.expectEqual(args.numPositional(), 2);
+    }
+
+    // Other options don't, and neither does one only set by its default.
+    try testz.expectError(parser.parseArray(&.{"-v"}), zargs.ParseError.TooFewPositionalArguments);
+    try testz.expectError(parser.parseArray(&.{}), zargs.ParseError.TooFewPositionalArguments);
+}

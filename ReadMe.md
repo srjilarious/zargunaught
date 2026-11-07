@@ -2,7 +2,7 @@
 
 ![Logo](images/zargunaught.png)
 
-![Version Badge](https://img.shields.io/badge/Version-2.0.0-brightgreen)
+![Version Badge](https://img.shields.io/badge/Version-2.0.1-brightgreen)
 ![Zig Version Badge](https://img.shields.io/badge/Zig%20Version-0.17.0--dev.1857%2B3c46da14d-%23f7a41d?logo=zig)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -132,7 +132,7 @@ if(args.hasOption("help")) {
 
 `printHelp` prints the help for whatever was parsed: when a command was given, as in `prog transmogrify --help`, it prints just that command's help (`printCommandHelp`), and otherwise the full help (`printHelpText`).  You can call either of those directly too.
 
-The full help starts with a usage line built from the configuration, like `Usage: prog [options] [command] <input> [output]`, followed by the arguments, the global options, and the commands grouped as configured.  A command's help has its own usage line (`Usage: prog [options] transmogrify [options] [thing]`), its description, its arguments, its options and the global options.
+The full help starts with a usage line built from the configuration, like `Usage: prog [options] [command] <input> [output]`, followed by the arguments, the options (headed "Global Options" when there are commands, since commands have options of their own), and the commands grouped as configured.  A command's help has its own usage line (`Usage: prog [options] transmogrify [options] [thing]`), its description, its arguments, its options and the global options.
 
 Each option that takes values shows a placeholder after its names: `<value>` when a value is required, `[value]` when it's optional, and `...` when it takes more than one.  Set `valueName` on the option to name it (`.valueName = "file"` gives `--out <file>`).  When the exact number of values isn't clear from the placeholder, or the option has a default, a note follows the description, like `(1 to 3 values)`, `(default: fast)` or `(on by default, --no-color turns it off)`.
 
@@ -189,6 +189,16 @@ var parser = try zargs.ArgParser.init(std.heap.page_allocator, .{
 ```
 
 This shows as `Usage: gw-grep <pattern> [path...]`.  Optional arguments must come after the required ones, and only the last may repeat; anything else is an `InvalidPositionals` configuration error.  When `minNumPositionalArgs` and `maxNumPositionalArgs` are left unset, they come from the list: here at least one argument, with no maximum since `path` repeats.
+
+Required positional arguments would normally stop `prog --help` with `TooFewPositionalArguments`.  Set `skipsPositionalChecks = true` on options like `--help` and `--version` to skip the positional count checks whenever the user gives them:
+
+```zig
+.opts = &.{
+    .{ .longName = "help", .shortName = "h", .description = "Print this help and exit", .skipsPositionalChecks = true },
+},
+```
+
+Only an option the user actually gave skips the checks; one set by its default doesn't.
 
 Commands can have their own `positionals`, `minNumPositionalArgs` and `maxNumPositionalArgs`, which replace the parser-wide ones while that command is in use.  A limit a command leaves unset falls back to the parser-wide one, and a command with no positionals of its own shows the parser-wide ones in its help.
 

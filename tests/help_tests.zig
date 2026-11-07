@@ -194,3 +194,18 @@ pub fn commandHelpTest(io: std.Io, alloc: std.mem.Allocator) !void {
     try help.printHelp(&args);
     try testz.expectEqualStr(printer.array.writer.written(), text);
 }
+
+pub fn optionsHeadingWithoutCommandsTest(io: std.Io, alloc: std.mem.Allocator) !void {
+    _ = io;
+    var parser = try zargs.ArgParser.init(alloc, .{
+        .name = "plain",
+        .opts = &.{.{ .longName = "verbose", .description = "More output." }},
+    });
+    defer parser.deinit();
+
+    const text = try helpText(&parser, alloc, null);
+    defer alloc.free(text);
+
+    try expectContains(text, "\nOptions\n  --verbose");
+    try testz.expectTrue(std.mem.indexOf(u8, text, "Global") == null);
+}

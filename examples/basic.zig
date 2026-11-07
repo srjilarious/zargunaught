@@ -17,7 +17,7 @@ fn basicOptionParsing(process_args: std.process.Args) !void {
             .{ .longName = "alpha", .description = "The first option", .maxNumParams = 0 },
             .{ .longName = "beta", .shortName = "b", .description = "Another option", .maxNumParams = 1, .default = zargs.DefaultValue.param("thing") },
             .{ .longName = "gamma", .shortName = "g", .description = "The last option here.", .minNumParams = 1, .maxNumParams = 3, .valueName = "word" },
-            .{ .longName = "help", .description = "Prints out help for the program." },
+            .{ .longName = "help", .description = "Prints out help for the program.", .skipsPositionalChecks = true },
         },
         .groups = &.{
             .{
